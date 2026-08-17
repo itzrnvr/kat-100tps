@@ -67,3 +67,10 @@ compute 18ms. 566MB/62ms = **9.1GB/s effective vs ~55GB/s available**.
 8. Q‖gate per-head interleave (not concat halves) in donor attn_q.
 9. DFlash fc consumes n_capture×n_embd features; capture-ids override + N=1 fix.
 10. LNK1104: running exe holds file (kill before relink).
+
+## 2026-08-18 — AcceptMoE-style verify-union restriction (KAT_UNION_K) — NEGATIVE
+- Same-binary A/B, CQ3+gbuzhf recipe, n=5/workload, e2e rates:
+  off: copy 16.3 / pattern 20.8 | K=24: copy 14.4 / pattern 19.6
+- Draft acceptance unchanged (0.75-0.79 copy) -> not quality-bound;
+  overhead-bound. Natural union already compact at our tree sizes.
+- Patch stays in C:/src/lm9873 (env-gated, default off). DESIGN.md V36.
