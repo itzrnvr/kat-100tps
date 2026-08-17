@@ -1,0 +1,162 @@
+diff --git a/server/src/qwen35moe/qwen35moe_pipelined_decode.cpp b/server/src/qwen35moe/qwen35moe_pipelined_decode.cpp
+index b81e8b8..dc97214 100644
+--- a/server/src/qwen35moe/qwen35moe_pipelined_decode.cpp
++++ b/server/src/qwen35moe/qwen35moe_pipelined_decode.cpp
+@@ -14,6 +14,7 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
++#include <new>
+ #include <string>
+ 
+ namespace dflash::common {
+@@ -56,7 +57,7 @@ static bool build_cached_deltanet_prefn(
+     out.free();
+ 
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: 512MB x ~60 cached graphs OOMs 32GB laptops (metadata-only arenas)
+     ip.mem_buffer = nullptr;
+     ip.no_alloc   = true;
+     out.ctx = ggml_init(ip);
+@@ -124,7 +125,7 @@ static bool build_cached_attn_prefn(
+     out.alloc = keep_alloc;
+ 
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: 512MB x ~60 cached graphs OOMs 32GB laptops (metadata-only arenas)
+     ip.mem_buffer = nullptr;
+     ip.no_alloc   = true;
+     out.ctx = ggml_init(ip);
+@@ -286,6 +287,61 @@ bool init_pipelined_decode_state(
+     out.combine_zero_buf.resize((size_t)w.n_embd);
+     out.ffn_post_host_buf.resize((size_t)w.n_embd);
+     out.capture_host_buf.resize((size_t)w.n_embd);
++    out.fate_hint_buf.resize(64);
++
++    // Fate cross-layer prefetcher: copy all router weights to host RAM once.
++    // Enabled via DFLASH_FATE=1 (or DFLASH_FATE_CCT=<path> to also union a
++    // cross-layer co-activation table). Zero GPU cost: gates live in RAM and
++    // prediction runs on a CPU worker thread.
++    // Static instance owned here; re-init stops the worker thread first
++    // (stop() joins), then placement-news a fresh object — never move-assign
++    // a running FatePrefetcher (thread self-move is UB).
++    alignas(dflash::common::FatePrefetcher) static char fate_storage[sizeof(dflash::common::FatePrefetcher)];
++    static dflash::common::FatePrefetcher * fate_instance = nullptr;
++    if (fate_instance) {
++        fate_instance->stop();
++        fate_instance->~FatePrefetcher();
++        fate_instance = nullptr;
++    }
++    const char * fate_cct = std::getenv("DFLASH_FATE_CCT");
++    const bool fate_on = (std::getenv("DFLASH_FATE") != nullptr) || fate_cct;
++    if (fate_on) {
++        dflash::common::FateConfig fc;
++        fc.n_layers     = w.n_layer;
++        fc.n_embd       = w.n_embd;
++        fc.n_experts    = w.n_expert;
++        fc.top_k        = w.n_expert_used;
++        fc.max_prefetch = 16;
++        fc.pct_threshold = 0.75f;
++        fate_instance = new (fate_storage) dflash::common::FatePrefetcher(fc);
++        std::vector<const float *> gate_ptrs((size_t)w.n_layer, nullptr);
++        std::vector<float> gate_tmp;
++        bool gates_ok = true;
++        for (int il = 0; il < w.n_layer && gates_ok; ++il) {
++            ggml_tensor * g = w.layers[(size_t)il].ffn_gate_inp;
++            if (!g) { gates_ok = false; break; }
++            gate_tmp.resize(ggml_nbytes(g) / sizeof(float));
++            ggml_backend_tensor_get(g, gate_tmp.data(), 0, ggml_nbytes(g));
++            // keep our own copy alive for init (FatePrefetcher copies again)
++            static std::vector<std::vector<float>> gate_store;
++            gate_store.resize((size_t)w.n_layer);
++            gate_store[(size_t)il] = gate_tmp;
++            gate_ptrs[(size_t)il] = gate_store[(size_t)il].data();
++        }
++        if (gates_ok && fate_instance->init(gate_ptrs.data())) {
++            out.fate = fate_instance;
++            if (fate_cct && fate_instance->load_cct(fate_cct))
++                std::fprintf(stderr, "[pipelined] Fate: CCT table loaded from %s\n", fate_cct);
++            std::fprintf(stderr,
++                "[pipelined] Fate cross-layer prefetcher ON (%d layers x %d experts)\n",
++                w.n_layer, w.n_expert);
++        } else {
++            out.fate = nullptr;
++            std::fprintf(stderr, "[pipelined] Fate init FAILED; running without prefetch\n");
++        }
++    } else {
++        out.fate = nullptr;
++    }
+ 
+     // Check if routed FFN pipeline is disabled
+     const bool routed_disabled = (std::getenv("DFLASH_QWEN35MOE_NO_ROUTED") != nullptr);
+@@ -464,8 +520,21 @@ bool pipelined_decode_one_token(
+             }
+             const auto readback_t1 = PipelineClock::now();
+ 
+-            // Record routing data for predictor training
+             bool ffn_post_on_host = false;
++            // Fate: predict layer il+1's experts now (CPU thread) while this
++            // layer's FFN computes. Uses ffn_post already on host when the
++            // collector pulled it; otherwise fetch it (8 KB D2H, ~4 us).
++            if (state.fate) {
++                if (!ffn_post_on_host) {
++                    ggml_backend_tensor_get(cpg.ffn_post, state.ffn_post_host_buf.data(), 0,
++                                            sizeof(float) * (size_t)n_embd);
++                    ffn_post_on_host = true;
++                }
++                state.fate->submit(il, state.ffn_post_host_buf.data(),
++                                   global_ids, n_expert_used);
++            }
++
++            // Record routing data for predictor training
+             if (state.routing_collector) {
+                 ggml_backend_tensor_get(cpg.ffn_post, state.ffn_post_host_buf.data(), 0,
+                                         sizeof(float) * (size_t)n_embd);
+@@ -488,6 +557,20 @@ bool pipelined_decode_one_token(
+             int layer_cold_hits = 0;
+             // Spark expert cache: pull selected cold experts into spare GPU slots
+             // (LRU) so the lookup below serves them on-GPU; after warmup cold->0.
++            // Fate: proactively promote next-layer predicted experts into spare
++            // slots FIRST (they arrive during this layer's FFN compute), so by
++            // the time layer il+1 routes, its experts are already hot.
++            if (state.fate && storage.cache_slots > 0) {
++                const int n_hint = state.fate->take(il + 1, state.fate_hint_buf.data(),
++                                                    (int)state.fate_hint_buf.size());
++                for (int i = 0; i < n_hint; ++i) {
++                    const int32_t gid = state.fate_hint_buf[(size_t)i];
++                    if (gid >= 0 && gid < (int)storage.hot_local_by_global.size() &&
++                        storage.hot_local_by_global[(size_t)gid] < 0) {
++                        dflash::common::moe_hybrid_cache_swap_in(storage, gid, backend);
++                    }
++                }
++            }
+             if (storage.cache_slots > 0)
+                 for (int i = 0; i < n_expert_used; ++i)
+                     dflash::common::moe_hybrid_cache_swap_in(storage, global_ids[i], backend);
+diff --git a/server/src/qwen35moe/qwen35moe_pipelined_decode.h b/server/src/qwen35moe/qwen35moe_pipelined_decode.h
+index 4045f72..04b0a36 100644
+--- a/server/src/qwen35moe/qwen35moe_pipelined_decode.h
++++ b/server/src/qwen35moe/qwen35moe_pipelined_decode.h
+@@ -13,6 +13,7 @@
+ #include "../common/moe_hybrid_ffn_eval.h"
+ #include "../common/moe_hybrid_storage.h"
+ #include "../common/moe_routing_collector.h"
++#include "../common/fate_prefetch.h"
+ #include "../common/moe_expert_compute.h"
+ #include "graph_builders.h"
+ 
+@@ -151,6 +152,13 @@ struct PipelinedDecodeState {
+     // Optional routing data collector (not owned, set from backend)
+     MoeRoutingCollector * routing_collector = nullptr;
+ 
++    // Cross-layer gate prefetcher (Fate, arXiv 2502.12224). Owned by the
++    // backend; null = disabled. Predicts layer i+1 experts from layer i's
++    // ffn_post on a CPU thread, overlapping the current layer's FFN compute.
++    // Hints only — never changes routing semantics.
++    dflash::common::FatePrefetcher * fate = nullptr;
++    std::vector<int32_t> fate_hint_buf;
++
+     PipelinedDecodeState() = default;
+     ~PipelinedDecodeState() { destroy(); }
+     PipelinedDecodeState(const PipelinedDecodeState &) = delete;

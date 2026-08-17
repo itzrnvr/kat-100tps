@@ -1,0 +1,99 @@
+diff --git a/server/src/qwen35/graph_builders.cpp b/server/src/qwen35/graph_builders.cpp
+index d1bc288..076eced 100644
+--- a/server/src/qwen35/graph_builders.cpp
++++ b/server/src/qwen35/graph_builders.cpp
+@@ -32,7 +32,7 @@ bool build_layer_step(
+     const bool is_attn = (((layer_idx + 1) % w.full_attention_interval) == 0);
+ 
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: was 512MB; metadata-only arenas OOM 31GB laptops
+     ip.mem_buffer = nullptr;
+     ip.no_alloc   = true;
+     sg.ctx = ggml_init(ip);
+@@ -118,7 +118,7 @@ bool build_layer_prefn_step(
+     step_graph_free(sg);
+ 
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: was 512MB; metadata-only arenas OOM 31GB laptops
+     ip.mem_buffer = nullptr;
+     ip.no_alloc   = true;
+     sg.ctx = ggml_init(ip);
+@@ -207,7 +207,7 @@ bool build_hybrid_full_layer_step(
+     step_graph_free(sg);
+ 
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: was 512MB; metadata-only arenas OOM 31GB laptops
+     ip.mem_buffer = nullptr;
+     ip.no_alloc   = true;
+     sg.ctx = ggml_init(ip);
+@@ -289,7 +289,7 @@ bool build_target_step(
+     // replays instead of re-launching every kernel. Pairs with the
+     // step-invariant set_rows KV write (kv_write_rows) below.
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: was 512MB; metadata-only arenas OOM 31GB laptops
+     static thread_local std::vector<uint8_t> g_step_arena;
+     if (g_step_arena.size() < ip.mem_size) g_step_arena.resize(ip.mem_size);
+     ip.mem_buffer = g_step_arena.data();
+@@ -400,7 +400,7 @@ bool build_target_step_tree(
+     step_graph_free(sg);
+ 
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: was 512MB; metadata-only arenas OOM 31GB laptops
+     ip.mem_buffer = nullptr;
+     ip.no_alloc   = true;
+     sg.ctx = ggml_init(ip);
+diff --git a/server/src/qwen35moe/qwen35moe_pipelined_decode.cpp b/server/src/qwen35moe/qwen35moe_pipelined_decode.cpp
+index b81e8b8..dc97214 100644
+--- a/server/src/qwen35moe/qwen35moe_pipelined_decode.cpp
++++ b/server/src/qwen35moe/qwen35moe_pipelined_decode.cpp
+@@ -14,6 +14,7 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
++#include <new>
+ #include <string>
+ 
+ namespace dflash::common {
+@@ -56,7 +57,7 @@ static bool build_cached_deltanet_prefn(
+     out.free();
+ 
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: 512MB x ~60 cached graphs OOMs 32GB laptops (metadata-only arenas)
+     ip.mem_buffer = nullptr;
+     ip.no_alloc   = true;
+     out.ctx = ggml_init(ip);
+@@ -124,7 +125,7 @@ static bool build_cached_attn_prefn(
+     out.alloc = keep_alloc;
+ 
+     ggml_init_params ip{};
+-    ip.mem_size   = 512 * 1024 * 1024;
++    ip.mem_size   = 32 * 1024 * 1024;  // BUGFIX: 512MB x ~60 cached graphs OOMs 32GB laptops (metadata-only arenas)
+     ip.mem_buffer = nullptr;
+     ip.no_alloc   = true;
+     out.ctx = ggml_init(ip);
+@@ -286,6 +287,61 @@ bool init_pipelined_decode_state(
+     out.combine_zero_buf.resize((size_t)w.n_embd);
+     out.ffn_post_host_buf.resize((size_t)w.n_embd);
+     out.capture_host_buf.resize((size_t)w.n_embd);
++    out.fate_hint_buf.resize(64);
++
++    // Fate cross-layer prefetcher: copy all router weights to host RAM once.
++    // Enabled via DFLASH_FATE=1 (or DFLASH_FATE_CCT=<path> to also union a
++    // cross-layer co-activation table). Zero GPU cost: gates live in RAM and
++    // prediction runs on a CPU worker thread.
++    // Static instance owned here; re-init stops the worker thread first
++    // (stop() joins), then placement-news a fresh object — never move-assign
++    // a running FatePrefetcher (thread self-move is UB).
++    alignas(dflash::common::FatePrefetcher) static char fate_storage[sizeof(dflash::common::FatePrefetcher)];
++    static dflash::common::FatePrefetcher * fate_instance = nullptr;
++    if (fate_instance) {
++        fate_instance->stop();
++        fate_instance->~FatePrefetcher();
++        fate_instance = nullptr;
++    }

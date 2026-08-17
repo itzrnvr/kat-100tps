@@ -1,0 +1,99 @@
+diff --git a/server/deps/llama.cpp/ggml/src/ggml.c b/server/deps/llama.cpp/ggml/src/ggml.c
+index d54ce86..1ced2d4 100644
+--- a/server/deps/llama.cpp/ggml/src/ggml.c
++++ b/server/deps/llama.cpp/ggml/src/ggml.c
+@@ -6,6 +6,7 @@
+ #include "ggml-threading.h"
+ #include "ggml-cpu.h"
+ #include "ggml.h"
++#include <intrin.h>
+ 
+ // FIXME: required here for quantization functions
+ #include "ggml-quants.h"
+@@ -325,6 +326,14 @@ void ggml_log_callback_default(enum ggml_log_level level, const char * text, voi
+ #endif
+ 
+ 
++#if defined(_MSC_VER) || defined(__MINGW32__)
++// ── VirtualAlloc fallback registry (file scope; used by aligned malloc/free) ──
++#define GGML_VA_REG_MAX 64
++static void * g_ggml_va_reg[GGML_VA_REG_MAX];
++static CRITICAL_SECTION g_ggml_va_cs;
++static BOOL g_ggml_va_cs_init = FALSE;
++#endif
++
+ void * ggml_aligned_malloc(size_t size) {
+ #if defined(__s390x__)
+     const int alignment = 256;
+@@ -333,7 +342,28 @@ void * ggml_aligned_malloc(size_t size) {
+ #endif
+ 
+ #if defined(_MSC_VER) || defined(__MINGW32__)
+-    return _aligned_malloc(size, alignment);
++    // BUGFIX [2026-08-17]: _aligned_malloc can fail on fragmented heap /
++    // transient commit spikes even with free RAM (observed: 0.12 GiB request
++    // failing with 12.5 GB free on a 31 GB box during MoE draft init).
++    // Fallback: VirtualAlloc (fresh VA, CRT-heap-immune), tracked in a small
++    // registry so ggml_aligned_free routes to VirtualFree correctly.
++    {
++        if (!g_ggml_va_cs_init) { InitializeCriticalSection(&g_ggml_va_cs); g_ggml_va_cs_init = TRUE; }
++        void * p = _aligned_malloc(size, alignment);
++        if (p) return p;
++        /* uses file-scope g_ggml_va_registry below */
++        // reserve one extra granularity unit for alignment slack
++        size_t va_size = ((size + alignment + 65535) / 65536) * 65536;
++        char * base = (char *) VirtualAlloc(NULL, va_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
++        if (!base) return NULL;
++        char * aligned = (char *) (((uintptr_t)(base + alignment - 1)) / alignment * alignment);
++        EnterCriticalSection(&g_ggml_va_cs);
++        for (int i = 0; i < GGML_VA_REG_MAX; ++i) {
++            if (!g_ggml_va_reg[i]) { g_ggml_va_reg[i] = base; break; }
++        }
++        LeaveCriticalSection(&g_ggml_va_cs);
++        return aligned;
++    }
+ #else
+     if (size == 0) {
+         GGML_LOG_WARN("Behavior may be unexpected when allocating 0 bytes for ggml_aligned_malloc!\n");
+@@ -381,9 +411,33 @@ void * ggml_aligned_malloc(size_t size) {
+ #endif
+ }
+ 
++
+ void ggml_aligned_free(void * ptr, size_t size) {
+     GGML_UNUSED(size);
+ #if defined(_MSC_VER) || defined(__MINGW32__)
++    // BUGFIX [2026-08-17]: if this pointer came from the VirtualAlloc
++    // fallback in ggml_aligned_malloc, free the BASE via VirtualFree
++    // (passing it to _aligned_free would corrupt the CRT heap). Registry
++    // base pointers are page-aligned starts; a returned aligned pointer lies
++    // within [base, base + alignment) of its entry.
++    {
++        EnterCriticalSection(&g_ggml_va_cs);
++        void * hit = NULL;
++        for (int i = 0; i < GGML_VA_REG_MAX; ++i) {
++            void * base = g_ggml_va_reg[i];
++            if (base) {
++                uintptr_t b = (uintptr_t) base;
++                uintptr_t a = (uintptr_t) ptr;
++                if (a >= b && a < b + 65536 + 64) {
++                    g_ggml_va_reg[i] = NULL;
++                    hit = base;
++                    break;
++                }
++            }
++        }
++        LeaveCriticalSection(&g_ggml_va_cs);
++        if (hit) { VirtualFree(hit, 0, MEM_RELEASE); return; }
++    }
+     _aligned_free(ptr);
+ #elif GGML_USE_CPU_HBM
+     if (ptr != NULL) {
+@@ -1757,6 +1811,7 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
+         /*.objects_end        =*/ NULL,
+     };
+ 
++    if (ctx->mem_buffer == NULL) { fprintf(stderr, "[oom-diag] ggml_init failed: mem_size=%.2f GiB caller=%p\n", (double)mem_size/(1024.0*1024.0*1024.0), _ReturnAddress()); }
+     GGML_ASSERT(ctx->mem_buffer != NULL);
+ 
+     GGML_ASSERT_ALIGNED(ctx->mem_buffer);

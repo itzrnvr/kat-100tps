@@ -1,0 +1,98 @@
+diff --git a/server/src/internal.h b/server/src/internal.h
+index 0e2b2cd..53c9ae6 100644
+--- a/server/src/internal.h
++++ b/server/src/internal.h
+@@ -228,7 +228,8 @@ bool load_target_gguf(const std::string & path,
+ bool load_target_gguf_partial(const std::string & path,
+                               ggml_backend_t backend,
+                               const TargetLoadPlan & plan,
+-                              TargetWeights & out);
++                              TargetWeights & out,
++                              const std::vector<int> * capture_ids_override = nullptr);
+ 
+ void free_target_weights(TargetWeights & w);
+ 
+diff --git a/server/src/qwen35/gguf_target_loader.cpp b/server/src/qwen35/gguf_target_loader.cpp
+index 1f917ee..bd535c1 100644
+--- a/server/src/qwen35/gguf_target_loader.cpp
++++ b/server/src/qwen35/gguf_target_loader.cpp
+@@ -319,7 +319,8 @@ bool load_target_gguf(const std::string & path,
+ bool load_target_gguf_partial(const std::string & path,
+                               ggml_backend_t       backend,
+                               const TargetLoadPlan & plan_in,
+-                              TargetWeights &      out) {
++                              TargetWeights &      out,
++                              const std::vector<int> * capture_ids_override) {
+ 
+     // ── 1. Parse metadata + create a ggml_context holding tensor descriptors ─
+     ggml_context * meta_ctx = nullptr;
+@@ -545,12 +546,36 @@ bool load_target_gguf_partial(const std::string & path,
+         std::printf("[loader] eos_id=%d eos_chat_id=%d\n", out.eos_id, out.eos_chat_id);
+     }
+ 
+-    // Compute capture layer IDs: evenly spaced through the target layers.
+-    // step = (n_layer - 2) / (N - 1), ids[k] = 1 + k * step.
++    // Compute capture layer IDs. Data-driven first (dflash.target_layer_ids
++    // shipped in the DRAFT GGUF — the laguna loader's proven mechanism):
++    // MTP drafts want ids={n_layer-1} (final layer). Legacy fallback: evenly
++    // spaced ids, step = (n_layer - 2) / (N - 1), ids[k] = 1 + k * step;
++    // N==1 selects the final layer directly (old code divided by zero).
++    // NOTE: the ids live in the draft GGUF, but this loader runs before the
++    // draft; the capture_ids_override pointer (set from the server once the
++    // draft is loaded) takes precedence when non-empty — see server_main.
+     {
++        // BUGFIX [2026-08-18]: a non-empty override must ALSO set N. The old
++        // guard (size==N) silently dropped {39} when N defaulted to 5, fell
++        // back to linspace, and the 5x2048 feature vector blew up fc_in=2048
++        // at runtime (ggml_can_mul_mat assert). capture_layer_ids is a fixed
++        // 5-slot array; clamp overrides to 5 entries.
++        if (capture_ids_override && !capture_ids_override->empty()) {
++            const int N = (int)capture_ids_override->size();
++            out.n_capture_layers = (N <= 5 ? N : 5);
++            for (int k = 0; k < out.n_capture_layers; k++)
++                out.capture_layer_ids[k] = (*capture_ids_override)[k];
++            std::fprintf(stderr, "[loader] capture ids (override): N=%d first=%d\n",
++                         out.n_capture_layers, out.capture_layer_ids[0]);
++        } else {
+         const int N = out.n_capture_layers;
+-        const int step = ((int)n_layer - 2) / (N - 1);
+-        for (int k = 0; k < N; k++) out.capture_layer_ids[k] = 1 + k * step;
++        if (N == 1) {
++            out.capture_layer_ids[0] = (int)n_layer - 1;
++        } else {
++            const int step = ((int)n_layer - 2) / (N - 1);
++            for (int k = 0; k < N; k++) out.capture_layer_ids[k] = 1 + k * step;
++        }
++        }
+     }
+ 
+     out.layers.assign((size_t)n_layer, TargetLayer{});
+diff --git a/server/src/qwen35moe/qwen35moe_backend.cpp b/server/src/qwen35moe/qwen35moe_backend.cpp
+index 12ae1c6..067a028 100644
+--- a/server/src/qwen35moe/qwen35moe_backend.cpp
++++ b/server/src/qwen35moe/qwen35moe_backend.cpp
+@@ -102,7 +102,23 @@ bool Qwen35MoeBackend::load_target_model(ggml_backend_t backend, TargetWeights &
+     // Expert tensors get metadata descriptors but are NOT allocated on GPU.
+     TargetLoadPlan plan;
+     plan.skip_expert_tensors = true;
+-    if (!load_target_gguf_partial(cfg_.target_path, backend, plan, out)) {
++    // Data-driven capture ids (laguna-style): DFLASH_CAPTURE_IDS="39" for a
++    // final-layer MTP-style draft. Empty -> legacy linspace formula.
++    static std::vector<int> capture_ids;
++    if (capture_ids.empty()) {
++        if (const char * e = std::getenv("DFLASH_CAPTURE_IDS")) {
++            int v; const char * p2 = e;
++            while (*p2) {
++                char * end = nullptr;
++                v = (int)std::strtol(p2, &end, 10);
++                if (end == p2) break;
++                capture_ids.push_back(v);
++                p2 = (*end == ',') ? end + 1 : end;
++            }
++        }
++    }
++    if (!load_target_gguf_partial(cfg_.target_path, backend, plan, out,
++                                  capture_ids.empty() ? nullptr : &capture_ids)) {
+         return false;
+     }
+ 
