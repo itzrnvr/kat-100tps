@@ -891,3 +891,32 @@ remaining multiplier available TODAY.
   trainable, our tooling), or (b) ninfer-style MTP-native kernels.
 - RESULT TODAY: with the weak draft auto-disabled: 22.4 median /
   24.3 peak tok/s (n=10) — BEST measured config on this box.
+
+## V32 CQ3 + gbuzhf RECIPE — SPEC DECODE WORKS (measured)
+KAT-CQ3-MTP: CQ2 trunk + pristine BF16 MTP head (gbuzhf donor =
+Qwen3.6 original) requantized OUR way (Q8_0 matmuls / Q4_K RTN
+experts / F32 norms). Build bugs fixed: sf keys lack .weight on
+expert tensors; n_kv off-by-one (56 vs 55).
+RECIPE (gbuzhf coordinate-ascent, 79 configs, same GPU class):
+  draft-mtp,ngram-mod TOGETHER; n-max 1 (not 2+); p-min 0.75;
+  ngram-mod 8/24/48. MTP alone = net loss (we measured 8.9 — same).
+RESULTS (ours):
+  mixed coding bench: 18.1 med, peak 48.6, acceptance 79-82%
+  copy-heavy: 46.5 MEDIAN / 48.6 sustained (vs AR 12.3 = 3.8x)
+  vs gbuzhf's same-recipe numbers (71 copy / 33 agentic): ours in
+  range accounting for their UD-Q4_K_XL tier vs our CQ2 map.
+LADDER NOW: stock AR 12.3 -> lucebox AR 22.4 -> CQ3 spec 46.5 copy.
+NEXT: same recipe on the lucebox pipelined engine (22.4 base x spec
+multiplier) — the engine accepts embedded nextn; CQ3 has it.
+
+## V33 ENGINE-STACK FINAL MAPPING (measured)
+lucebox loads CQ3 (nextn validated, excluded from target) but its
+qwen35moe draft path is DFlash-format only — embedded MTP not wired
+(no eh_proj consumer on that path; verified twice).
+=> The two best measured configs are ENGINE-BOUND:
+  - COPY/PATTERN workloads: stock+CQ3 recipe => 46.5/38.8 median
+  - MIXED coding: lucebox pipelined => 22.4 median / 24.3 peak
+CROSSOVER: ngram-mod hit-rate decides. Agent loops w/ repeated tool
+schemas + code patterns = stock+spec wins. Cold novel = lucebox AR.
+100+ remains gated on: trained DFlash-fc draft on lucebox (41MB) or
+NInfer batched-verify kernels. Both scoped; neither is config work.
