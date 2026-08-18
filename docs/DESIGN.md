@@ -920,3 +920,232 @@ CROSSOVER: ngram-mod hit-rate decides. Agent loops w/ repeated tool
 schemas + code patterns = stock+spec wins. Cold novel = lucebox AR.
 100+ remains gated on: trained DFlash-fc draft on lucebox (41MB) or
 NInfer batched-verify kernels. Both scoped; neither is config work.
+
+## V34 SCHOLAR SWEEP TOP-3 (10 new papers, Jan-Aug 2026)
+1. 35B-on-6GB (2606.24031): OUR EXACT MODEL FAMILY (Qwen3.6-35B-A3B,
+   GDN, 4-bit) on 6GB 2011 GPU. Hand-written W4A8 SSSE3 CPU GEMV decode
+   + grouped Q4 expert GEMM. Negative-results map: GPU-head offload,
+   hyperthreading, GPU-kernel rewrites ALL FAIL. Direct recipe + trap map.
+2. AcceptMoE (2608.02989): verifier-side expert-set restriction
+   conditioned on CACHE RESIDENCY (not prefetch). 2.06x under offload,
+   -73-77% H2D traffic, 0.27pp loss. Composes w/ our ngram tree natively.
+3. WiSP (2606.21868): MEASURED "prefetching helps little in single-
+   stream PCIe-bound decode" -> VRAM ALLOCATION (MV-WSA) is the lever.
+   1.95x byte-identical. Redirects our prefetch-heavy plan.
++ EVICT (2605.00342): lossless draft-tree truncation (compose).
++ EcoSpec (2607.12696): re-rank ngram candidates by expert-reuse cost.
+VALIDATION: 2606.21428 (llama.cpp 8GB Jetson study): "cost tracks TOTAL
+params not active ones" — matches our 9.1/55 GB/s decomposition exactly.
+IMPLICATION: Fate A/B result (whatever it is) likely small; the big
+levers are (a) AcceptMoE verify-restriction, (b) W4A8 CPU GEMV kernel,
+(c) EcoSpec ngram re-ranking. All C++ portable, no CUDA graphs.
+
+## V35 FATE A/B RESULT (measured, decisive)
+Fate cross-layer prefetcher ON (lazy-init fix confirmed: "OK (40
+layers)", placement intact at 3.05GiB core): 4.0-4.6 t/s.
+OFF: 22.4 t/s. => 5x REGRESSION. Root cause: per-layer sync D2H
+(ffn_post pull) + CPU gate matmul on the same 8 cores doing expert
+GEMV — the prefetch overhead IS the pipeline stall.
+CONFIRMS WiSP (2606.21868) on our hardware: single-stream
+bandwidth-bound decode gains ~nothing from routing prediction.
+PREFETCH PATH CLOSED. Remaining levers (all verify/allocation-side):
+AcceptMoE residency-conditioned verify sets, EcoSpec ngram candidate
+re-ranking by expert reuse, EVICT tree truncation, W4A8 CPU GEMV.
+
+## V36 ACCEPTMOE-STYLE UNION RESTRICTION — MEASURED NEGATIVE (stock engine)
+Patch: llama.cpp b9873 build_moe_ffn + KAT_UNION_K env (commitment-weighted
+union mask, 2..64-token batches only). Binary verified (KAT_UNION_K string
+in llama.dll). A/B same binary, same CQ3+gbuzhf recipe, n=5/workload:
+  baseline (off): copy 16.3 med / pattern 20.8 med (e2e incl prefill)
+  KAT_UNION_K=24: copy 14.4 / pattern 19.6  (-12% / -6%)
+  acceptance: unchanged 0.75-0.79 copy (restriction not quality-bound)
+INTERPRETATION: with acceptance stable, the extra mask graph ops (9 ops x
+40 layers x verify step) cost more than the expert-read savings — because
+the natural union across verify rows is ALREADY compact in stock
+(near-duplicate rows -> highly correlated routing). AcceptMoE's union
+blowup premise does not bind at our tree sizes (n-max 1, mean len 14-19).
+The M~1.4 fragmentation is a LUCEBOX-verify-path property.
+DECISION: keep patch in tree (off by default, env-gated); record negative;
+pivot to lucebox pipelined + spec (the 22.4 -> 55-70 path).
+
+## V37 DFLASH-FC DRAFT CAMPAIGN STATE (2026-08-18)
+Infra all verified: trace dumper (3 layout bugs caught+fixed: layer-major
+staging, chunk-indexed staging, 2GB ftell overflow), 136,986 verified rows,
+export roundtrip (rel err 0.0054 corr 1.0), engine probes (features norm 30
+= healthy; head path clean).
+TRAINER LADDER (val acc = chain-relevant top-1):
+  v2 fc-only, last-token QUERY geometry (wrong vs engine): 74.2%
+  v3 fc-only, engine-exact mask-query block: 6.7% (full 16-row) / 17.2% (rows 1-4)
+  v4 whole-draft unfrozen (fc+attn+ffn ~90MB, lr 1e-4): running
+DIAGNOSIS: mask-query block-diffusion needs a net TRAINED for it (DFlash
+trains 5 layers from scratch); donor MTP block was trained for sequential
+eh_proj fusion. fc-only cannot bridge; whole-draft may partially.
+ECONOMICS: block verify costs verify_width target rows (6-16). >100 t/s
+needs ~0.7 sustained per-row acceptance. Row-0 (last_tok query) geometry
+= v2's 74% — single-proposal mode (verify width 2) is a guaranteed
+fallback worth ~1.5x (22.4 -> ~33) if v4 disappoints.
+NEXT: bench v4; if >=40% row-1 acc -> full chain on lucebox; if not ->
+single-proposal patch OR pivot remaining effort to stock-spec verify
+batching (46.5 copy base).
+
+## V38 DRAFT PATH FINAL VERDICT + PIVOT (2026-08-18)
+v5 (fc-only, all-rows last-tok query block): collapsed to 6.9% — identical
+queries + RoPE-only differentiation = degenerate for the frozen donor
+layer. Trainer ladder complete: 74.2% (v2 geometry, single-row causal) /
+6.7% / 17.2% / 16.7% (whole-draft) / 6.9% (v5). CONCLUSION: block-diffusion
+drafting requires a net trained from scratch (DFlash trains 5 layers; our
+1-layer donor MTP block cannot). Single-proposal caps at ~1.2x.
+PRESERVED: trace infra, 74% fc artifact, DFLASH_QUERY_LAST_TOK flag,
+engine probes. PIVOT: union restriction v2 — V36 measured acceptance
+STABLE (0.79) under K=24; v1 loss was pure graph-op overhead. v2 =
+penalty as static input tensor (1 add op, no rebuilds). Target: halve
+expert reads per verify row on the 46.5 copy config => 70-93+ t/s.
+
+## V39 USER-DUMPED PAPERS — THREE NEW LEVERS (2026-08-18)
+1. DSpark (2607.05147 + HF ecosystem): DFlash iteration, block draft +
+   Markov head + confidence head. KOOPAH V2 DRAFT EXISTS FOR OUR EXACT
+   FAMILY (Qwen3.6-35B-A3B hybrid GDN): 3.1x solo vLLM, ~2.5x llama.cpp
+   class, per-pos acceptance ~0.78 FLAT over 8 positions, works on
+   Q4_K_M-tier targets (0.313). GGUFs shipped. llama.cpp branch:
+   satindergrewal/llama.cpp@dspark-qwen35 (cloned to C:/src/lmdspark).
+   NOTE from card: acceptance tracks TARGET quant quality (our CQ2/CQ3
+   imatrix-class => good); head shares target embed+lm_head (common-mode
+   quant error — no precision tax).
+2. JetSpec (2606.18394): causal parallel draft head — one-forward block
+   drafting WITH branch-wise causal conditioning (solves exactly the
+   marginal-vs-chain dilemma that killed our donor-block attempts v3-v5).
+   9.64x H100 MATH-500. Code+models public.
+3. Attention Drift (2605.09992): explains v2->chain collapse (hidden-state
+   magnitude grows monotonically with chain depth in pre-norm drafter
+   stack). Fixes: post-norm drafter hidden + per-hidden-state RMSNorm
+   after target capture (= lucebox aux_hidden_norms, already plumbed).
+4. Bole (2608.01651): tree speculation for HYBRID-ATTENTION models (our
+   class): closed-form tree recurrence, parallel node verify 3.4-7.7x,
+   token-level state factors. SGLang-only today; blueprint for a lucebox
+   hybrid_forward_batch tree-verify patch.
+PLAN: DSpark v2 GGUF on dspark branch NOW (drop-in, 2.5-3x class on our
+46.5 base => 100-140). JetSpec head training as follow-up using our
+136k verified traces. Drift fixes if we retrain anything ourselves.
+
+## V40 SPD (2605.30852) — PIPELINE-DRAFT SYNERGY (2026-08-18)
+SPD: partition target into n pipeline stages; PDM draft aggregates
+multi-depth target features, runs CONCURRENTLY with pipeline steps ->
+bounded prediction difficulty (single next-token), higher acceptance,
+hidden draft latency.
+MAP TO US: lucebox IS a pipelined engine whose DFlash draft already
+consumes 5-capture-layer features (= PDM design). Our 74% row-1 fc fits
+the PDM role exactly. But lucebox runs the draft SERIALLY between steps
+-> hiding draft latency behind the pipeline = scheduling change in
+do_hybrid_spec_decode, no new weights.
+STACK VIEW: SPD hides draft latency + Bole hides verify latency (tree
+closed-form for GDN) + DSpark raises acceptance (drop-in head). All
+three compose on lucebox.
+
+## V41 DSPARK v2 ON KAT — WORKS (measured 2026-08-18)
+Koopah Qwen3.6-35B-A3B-NVFP4-DSPARK-v2-Q8_0 (556MB) on KAT-CQ3-MTP via
+satindergrewal/llama.cpp@dspark-qwen35 (block_size=8, n_extract=8):
+  acceptance 0.466-0.506, mean accepted len 4.69-5.05
+  e2e (ab_union, n=5): copy 29.5 med/38.8 peak (vs 16.3 stock-spec = +81%)
+                       pattern 23.1 med (vs 20.8 = +11%)
+  decode tg 18-22 (tg_3s spikes 29.9); verify = 8-9 row batches.
+CROSS-MODEL TRANSFER CONFIRMED (KAT is a qwen35moe-family finetune).
+Head shares target embed+lm_head; acceptance tracks target quant quality
+(CQ2/CQ3 = imatrix class => good).
+NEXT LEVERS: (a) --spec-draft-conf-min tuning; (b) compose ngram-mod;
+(c) PORT union-v2 patch to lmdspark — DSpark verify batches (8-9 rows)
+are exactly the 2..64-token gate; V36 showed acceptance STABLE under
+K=24 restriction; restriction cuts per-verify expert reads (the
+dominant verify cost on CPU-resident experts).
+
+## V42 UNION-V2 + DSPARK A/B (measured 2026-08-18)
+Arms (same binary, same bench, e2e medians):
+  dspark alone:      copy 29.5-37.7 / pattern 20.7-23.1, peak 39.2/23.7
+  dspark + K=24:     copy 32.5 (peak 44.4) / pattern broken-run (peak 30.6)
+ACCEPTANCE ROSE under restriction: 0.60-0.81 vs 0.38-0.52 (restriction ->
+converged expert sets -> sharper greedy path -> higher draft agreement).
+CAVEAT: intermittent early-EOS derailment (gen=1 rows) — restriction
+sometimes breaks generation; likely EMA cold-start + K too tight early.
+NEXT: (a) warmup gate — no restriction first N steps (EMA fill); (b) try
+K=48/64; (c) check gen=1 pattern (which prompts, what position).
+
+## V43 UNION-V2 LADDER COMPLETE (measured, e2e ab_union medians)
+dspark alone      copy 29.5-37.7 / patt 20.7-23.1 (peak 39.2/23.7)
+dspark K=24 cold  copy 32.5 peak 44.4 / patt peak 30.6 — but early-EOS
+                  derailment; acceptance spiked 0.60-0.81
+dspark K=48 warm  copy 38.1 peak 38.9 / patt 20.3 (accept 0.37-0.52)
+dspark K=24 warm  copy 35.7 peak 37.8 / patt 21.2 (accept 0.47-0.53)
+VERDICT: restriction is SAFE with warmup (no derails) but the cold-start
+spike was the interesting artifact — warm gating removed both the derails
+AND the acceptance spike (same mechanism: early restriction = stronger
+prior = sharper path). Net: union-v2 ~= wash at K>=24 on this workload;
+expert-read savings offset by nothing dramatic. The 44.4 peak suggests
+per-request adaptation (restrict hard early, relax later) as the open
+thread, but not the 100tps lever by itself.
+BEST CONFIG NOW: dspark v2 alone, copy 37.7 med — 3.1x over stock AR 12.3.
+REMAINING 100TPS GAPS: verify cost (8-9 rows through CPU experts) and
+prefill share in e2e. Decode-only rates are the target metric.
+
+## V44 HANDOFF RECORD — UNTRIED ARMS + BOTTLENECK QUALIFICATION
+STATE: best = dspark v2 alone, copy 37.7 e2e med (3.1x stock AR). The 100tps
+goal is NOT met. Two ZERO-REBUILD arms untried (both are relaunch-only):
+
+ARM A — ngram-mod COMPOSE (--spec-type draft-dspark,ngram-mod):
+  Hypothesis: ngram feeds high-confidence continuation tokens into the
+  same verify batch; on repetitive code (agent loops, schemas) commits/
+  step grow past dspark's 4.7-5.2 mean len. Judge on a HIGH-REPETITION
+  copy prompt (ab_union COPY is moderate; craft a repetition-heavy one).
+  Decision: adopt if commits/step grows >15% without acceptance collapse.
+
+ARM B — conf-min TRUNCATION SWEEP (--spec-draft-conf-min 0.2/0.35/0.5):
+  Hypothesis: Koopah head ships a confidence head; gating verify rows
+  cuts the 8-9-row verify cost where acceptance is doomed anyway
+  (their card: no engine wires it yet; we can). Decision: adopt the
+  best latency/step x commits/step product.
+
+BOTTLENECK QUALIFICATION: "verify cost is binding" is measured (e2e vs
+decode-rate gap + union null result). WHICH verify component dominates
+(expert gather vs GDN recurrence vs GPU<->CPU handoff) is NOT yet
+measured. Union-v2's null ELIMINATED expert-set-size as the lever at
+K>=24 (safe-warmup). NEXT SESSION SHOULD START WITH a per-stage verify
+profile (server timing buckets or nsys) BEFORE any Bole-scale patch —
+Bole targets GDN recurrence; if the profile says expert gather or
+handoff instead, Bole is the wrong patch.
+
+## V45 COMPOSE ARM — DSPARK + NGRAM-MOD WORKS (measured)
+--spec-type draft-dspark,ngram-mod (+ p-min 0.75, ngram 8/24/48):
+  copy 47.4 MED / 52.2 PEAK (vs 37.7 dspark alone = +26%)
+  pattern 21.7 / 26.5 (parity w/ dspark alone — expected, ngram needs
+  repetition)
+  mean-len spikes 7.60 on repetitive tasks (dspark-alone ceiling ~5.2)
+  => ngram continuations verified in the same batch and accepted.
+BEST CONFIG NOW: compose. 3.9x stock AR e2e. Union-v2 not needed here.
+REMAINING GAP to 100: ~2.1x. Verify cost per step (9-16 rows through
+CPU experts) still binding; prefill share matters on short gens.
+
+## V46 WIDTH-4 DECOMPOSITION (measured)
+n-max 8:  copy 47.4 med / decode tg peak 53.0, mean-len 4.7-7.6
+n-max 4:  copy 46.9 med / pattern 23.8 (up from 21.7!), tg peak similar
+HALVING VERIFY ROWS CHANGED ALMOST NOTHING (46.9 vs 47.4; pattern +2).
+=> VERIFY WIDTH IS NOT THE BINDING COST at these acceptance levels.
+The binding cost is per-STEP fixed overhead: draft forward (556MB head
+through the same CPU/GPU split) + graph launch + handoffs. Draft cost
+per committed token is ~fixed since both widths take 1 draft pass/step.
+NEXT: profile WHERE the step time goes (draft fwd vs verify fwd vs
+handoffs) before any Bole-scale patch. Also: --spec-draft-threads,
+draft GPU residency flags if they exist.
+
+## V47 NGLD-ALL NEGATIVE + STEP-COST DECOMPOSITION (measured)
+-ngld all (draft fully GPU): copy 23.3 (vs 47.4 compose) = 2x REGRESSION.
+Draft on GPU contends with target for VRAM+bandwidth — 3rd confirmation
+of the GPU-residency-loses pattern on 8GB (V29 GPU-head, V42-era sweeps,
+now draft). DRAFT STAYS CPU.
+Width-4 vs 8 null (V46) + this: the per-step cost is NOT verify rows and
+NOT draft residency — it's the serial draft->verify->draft round trip
+itself (graph launches + CPU/GPU handoffs per step).
+STATE: best = compose config, copy 47.4 med/52.2 peak e2e, decode tg
+peaks 53. 100tps needs ~2x more: candidates in order:
+  1. PER-STEP PROFILE (server timing buckets) — know exactly where the
+     ~50ms/step goes before patching
+  2. Bole-style fused tree-verify (GDN closed form) — kills the serial
+     round trip, biggest possible win, biggest patch
+  3. SPD-style pipeline-hidden drafting — draft overlaps verify
