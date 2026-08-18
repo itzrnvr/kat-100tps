@@ -1363,3 +1363,17 @@ models/dflash.cpp (cross-attn KV injection ordering for causal block
 layout) — a real engine feature, not a bugfix. PARKED with full trail
 (V58-V63). The acceptance lever remains: Koopah head 0.27-0.5 measured;
 KAT-trained head (satgeze DeepSpec lane) unaffected by this result.
+
+## V64 PIPELINE x COMPOSE — THE STACK WORKS (measured 2026-08-18)
+Discovery: KAT_NO_BIG_OFFLOAD guard breaks the DRAFT-context fit (8/8
+crashes); WITHOUT the guard, pipeline + draft + ngram all coexist.
+FULL STACK (KAT_PIPELINE=1, no guard, w8 compose):
+  novel: 22.9 peak tg decode (prev best 17-18.6) = +23-34%
+         e2e 11.5-18.3 on mixed prompts
+  copy:  58.1 MED / 58.4 PEAK e2e, TIGHT variance (was 56.0/59.5 loose)
+         acceptance 0.947 mean-len 23.7 preserved
+  fork AR alone + guard: 19.6 peak (also new fork-AR best)
+MECHANISM: pipelining overlaps the 82 GPU<->CPU split syncs; ngram
+acceptance ~1.0 keeps verify rows full so the overlap pays; the guard
+is only needed for AR (no draft) since draft-free fit doesn't trip OOM.
+BEST CONFIG NOW: kat-pc3.sh (pipeline + dspark + ngram w8).
