@@ -1320,3 +1320,16 @@ loader. Operational rule: >10GB free before -md launches; kill PPL/builds
 first. All earlier "race" observations consistent with this.
 QUEUE (memory-gated): (1) PPL CQ4 gate (~1h); (2) JetSpec causal-head
 test at high free RAM; (3) if acceptance >0.5 novel -> compose + bench.
+
+## V60 CQ4 QUALITY GATE — FAILED, DISCARDED (measured 2026-08-18)
+Same exe/corpus/flags: CQ3 (Q4_K experts) PPL 5.7066 +-0.046
+                       CQ4 (Q3_K experts) PPL 7.3471 +-0.062
+                       DELTA +1.64 (gate <= +0.05 per user's Q4K floor)
+Q3_K expert requant is decisively off-floor. Two candidate causes:
+(a) our Jacobi-vectorized q3k encoder converges worse than the C
+    sequential RMSE refinement; (b) KAT experts are unusually
+    Q3-sensitive. Either way: BYTE-CUT PATH CLOSED at current quality
+    floor. Q4_K (4.5bpw) is the floor; IQ4_XS (~6% smaller) is not a
+   lever. Deleted KAT-CQ4.gguf. Path to novel-100 now rests on:
+   JetSpec 8-layer causal head (converted+patched, test queued),
+   split-pipeline overlap (+33% proven AR), hot-expert VRAM cache.
