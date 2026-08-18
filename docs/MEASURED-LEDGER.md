@@ -74,3 +74,11 @@ compute 18ms. 566MB/62ms = **9.1GB/s effective vs ~55GB/s available**.
 - Draft acceptance unchanged (0.75-0.79 copy) -> not quality-bound;
   overhead-bound. Natural union already compact at our tree sizes.
 - Patch stays in C:/src/lm9873 (env-gated, default off). DESIGN.md V36.
+
+## 2026-08-18 — DSpark v2 (Koopah Qwen3.6-35B-A3B head) on KAT-CQ3 — BREAKTHROUGH
+- Cross-model transfer works: acceptance 0.38-0.52, mean accepted len 4.0-5.2 (block 8)
+- e2e ab_union (n=5): copy 37.7 med / 39.2 peak (vs 16.3 stock-spec = +131%)
+- 3.1x over stock AR baseline (12.3); lucebox AR (22.4) beaten decisively
+- Union-v2 restriction: safe w/ warmup but net-neutral at K=24/48; cold-K24
+  spiked acceptance to 0.81 + peaks 44.4 but derailed generation (recorded)
+- Engine: satindergrewal/llama.cpp@dspark-qwen35 + our KAT_UNION patches
