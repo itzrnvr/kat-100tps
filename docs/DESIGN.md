@@ -1404,3 +1404,21 @@ KAT_CASCADE v1 (ngram length-cap at head horizon): novel 22.2, acc
 USER DIRECTIVE STANDING: no discards for complexity; all levers stack.
 Live stack: pipeline x compose x (union|cascade envs, neutral now).
 Best: copy 70.0tg / novel 22.9tg.
+
+## V67 GOOSE (2604.02047) — ANISOTROPIC TREE INSIGHT (user find)
+N-gram vs statistical sources differ ~6x in acceptance (their 5-model
+study); optimal tree = DEEP SPINE of high-acceptance ngram tokens +
+WIDE branches of low-acceptance alternatives. 1.9-4.3x lossless.
+MAPS TO US: our compose already has both sources; our verify is LINEAR
+(no tree). Our measured acceptance gap matches theirs exactly (0.95
+ngram vs 0.3-0.5 head).
+LEVERS WITHOUT TREE-VERIFY (engine supports linear chains only):
+  1. RAISE ngram ceiling on copy (spine deeper): n-max 8 -> 16-24 with
+     conf-gated truncation; our V51 width-16 test collapsed BUT that was
+     width on the HEAD draft; ngram-specific depth is untested.
+  2. CASCADE-V2 (built, untested) implements the same principle at the
+     chain level: ngram spine truncated only when head prob collapses.
+  3. TRUE anisotropic tree needs fork tree-verify (mask support) —
+     same lane as NInfer/Bole tree kernels; noted as the full version.
+TEST NOW: ngram-only deep chain sweep (n-max 12/16/24, head p-min 0.75)
+  on copy — isolates the spine-depth variable.
