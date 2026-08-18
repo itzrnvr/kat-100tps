@@ -1377,3 +1377,30 @@ MECHANISM: pipelining overlaps the 82 GPU<->CPU split syncs; ngram
 acceptance ~1.0 keeps verify rows full so the overlap pays; the guard
 is only needed for AR (no draft) since draft-free fit doesn't trip OOM.
 BEST CONFIG NOW: kat-pc3.sh (pipeline + dspark + ngram w8).
+
+## V65 UNION-V3 + CONF-MIN ON PIPELINE STACK (measured 2026-08-18)
+Fused union (1 static add/layer, KAT_UNION_K=32) on pipeline×compose:
+  novel 22.3 peak (parity), copy 57.8 med/69.8 tg (parity), acc 0.947.
+  => fused version removes the graph overhead; restriction itself is
+  neutral-at-K32 on this workload. KEEP in tree (env), try K16/K48 later.
+conf-min 0.30 on pipeline stack: novel 22.7 peak, acc 0.39-0.48 (parity).
+  Scalar conf gate insufficient. USER-DIRECTED UPGRADE: Speculative
+  Cascades (Google blog) = tiered verification — cheap verifier first,
+  escalate disagreements only. Our instantiation: DSpark draft -> MTP
+  head LOGIT-verify (all 8 positions, ~4ms) -> truncate at confidence
+  cliff -> target verifies survivors. Stronger than scalar conf-min
+  because per-position logit scores catch the decay curve the scalar
+  misses. Implementing in fork speculative loop (draft logits in hand).
+
+## V66 SOFT-VERIFY CASCADE v1 + UNION-V3 VERDICTS (measured 2026-08-18)
+UNION-V3 (fused 1-add/layer, K=32, pipeline stack): novel 22.3, copy
+  57.8/69.8tg — parity. Overhead is gone (the V42 objection), but
+  restriction at K32 doesn't add speed on this workload. Env kept.
+KAT_CASCADE v1 (ngram length-cap at head horizon): novel 22.2, acc
+  identical — never triggers (ngram w24 max stays under 8 horizon).
+  No-op on this config; V2 (per-token logit scoring of ngram tokens
+  against dspark logits) is the real cascade — needs sampler-state
+  threading, next lane.
+USER DIRECTIVE STANDING: no discards for complexity; all levers stack.
+Live stack: pipeline x compose x (union|cascade envs, neutral now).
+Best: copy 70.0tg / novel 22.9tg.
