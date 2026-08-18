@@ -1333,3 +1333,19 @@ Q3_K expert requant is decisively off-floor. Two candidate causes:
    lever. Deleted KAT-CQ4.gguf. Path to novel-100 now rests on:
    JetSpec 8-layer causal head (converted+patched, test queued),
    split-pipeline overlap (+33% proven AR), hot-expert VRAM cache.
+
+## V61 JETSPEC HEAD — STILL 0.000 ACCEPTANCE (open, diagnosed trail)
+Causal+off-by-one fixes built and active (KAT_JETSPEC), load race solved
+(17.5GB free = 0 crashes, first try). Result: acceptance STILL 0.000.
+Conversion verified (q6k rel-err 0.0202, layouts match Koopah working
+head convention, tokenizer OK, metadata keys OK). Remaining suspects
+(need fork-side draft-token dump to discriminate):
+  - fork dflash graph vs JetSpec causal-head math (q_norm placement,
+    per-head norm order, cross-attn mask shape at block edges)
+  - fc input feature ORDER (5 layers x 2048 concat order)
+  - noise-embed/mask-token semantics for causal mode
+PATH: add KAT_SPEC_DEBUG-style draft-id dump to fork's speculative.cpp,
+compare against expected tokens for a fixed prompt. ~1-2h work.
+SESSION CLOSE STATE: best novel = dspark compose (17-22); best copy =
+68.5 decode/59.5 e2e. CQ4 dead (V60). Split-pipeline +33% proven (b9873
+binary). JetSpec head = highest-value open thread.
