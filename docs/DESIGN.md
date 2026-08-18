@@ -1149,3 +1149,35 @@ peaks 53. 100tps needs ~2x more: candidates in order:
   2. Bole-style fused tree-verify (GDN closed form) — kills the serial
      round trip, biggest possible win, biggest patch
   3. SPD-style pipeline-hidden drafting — draft overlaps verify
+
+## V48 PER-STEP PROFILE (verbose server, measured 2026-08-18)
+256-token novel-text gen, 77 spec steps, mean acc len 3.30:
+  draft (dspark fwd): 16.9 ms/step  (12%)
+  ngram drafting:     ~0 (table lookup)
+  accept accumulate:  ~0
+  => verify + fixed:  ~127 ms/step (88%)   [total decode 11.1s - 1.3s draft]
+Acc/pos DECAYS on KAT: (0.71, 0.51, 0.31, 0.22, 0.17, 0.16, 0.12, 0.10)
+  — vs Koopah's flat ~0.78 on their Qwen3.6 target. KAT finetune drift.
+IMPLICATION 1: 100tps at acc-len 3.3 needs step ~46ms = verify 3x faster
+  (Bole-class patch) OR acc-len ~7-8 (draft-quality ceiling on KAT).
+IMPLICATION 2: V46 width-null is CONFOUNDED — ngram compose backfills
+  the verify batch regardless of --spec-draft-n-max. Deconfound: pure
+  dspark, n-max 8 vs 3, measure tg.
+
+## V49 VERIFY COST MODEL — EXACT (measured, deconfounded)
+Pure-dspark novel-text width sweep (n-max 3 vs 8), tg decode:
+  w=3: 17.0 t/s | w=8: 10.6 t/s  => V46 null was ngram-backfill confound.
+Two-equation solve (steps = 256/E[len]):
+  step_time = 17ms (draft, fixed) + 33ms x verify_rows. Fixed ~ 0.
+Optimal novel width ~2-3 (model peak ~22 t/s == lucebox AR 22.4 sanity).
+Acc/pos decay (0.71,0.51,0.31,...) makes deep rows pure waste on novel.
+COPY is different: ngram acceptance ~1 fills w=8 profitably (47-53 t/s).
+=> ENGINE-POLICY RULE: adapt width per step from ngram-hit + conf head
+   (conf-min exists; per-step ngram-aware width is a small patch).
+100TPS DECODE MATH: needs 33ms/row -> ~10ms/row. That is expert-gather/
+GDN-row cost through -cmoe CPU path — the Bole/fused-verify class of
+patch, or batched expert kernels on the verify rows. All smaller levers
+are now measured and exhausted on this engine build.
+FINAL SESSION STATE: best copy 47.4/52.2 (compose), novel ~22 (either
+engine), 3.1-3.9x stock AR. 100 sustained not yet reached; remaining gap
+is concentrated in the 33ms/verify-row term.
