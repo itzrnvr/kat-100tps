@@ -1349,3 +1349,17 @@ compare against expected tokens for a fixed prompt. ~1-2h work.
 SESSION CLOSE STATE: best novel = dspark compose (17-22); best copy =
 68.5 decode/59.5 e2e. CQ4 dead (V60). Split-pipeline +33% proven (b9873
 binary). JetSpec head = highest-value open thread.
+
+## V63 JETSPEC THREAD CLOSED — DEFINITIVE CONTROL (measured 2026-08-18)
+Control run: SAME binary, SAME dump, Koopah dspark head:
+  top-1 probs 1.00 / 1.00 / 0.76 (confident, feature-dependent)
+  acceptance 0.27 — pipeline + injection + dump all VERIFIED SOUND.
+JetSpec head (same pipeline): near-uniform ~0.01 noise, 0.000, identical
+across all semantic variants tried (causal flip, +1 offset, masked).
+CONCLUSION: JetSpec causal 8-layer head requires a decoder-graph mode the
+fork's dspark runtime does not implement (its non-causal marginal-block
+path is Koopah-shaped). Making it work = writing a causal decoder path in
+models/dflash.cpp (cross-attn KV injection ordering for causal block
+layout) — a real engine feature, not a bugfix. PARKED with full trail
+(V58-V63). The acceptance lever remains: Koopah head 0.27-0.5 measured;
+KAT-trained head (satgeze DeepSpec lane) unaffected by this result.
