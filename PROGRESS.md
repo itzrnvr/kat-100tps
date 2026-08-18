@@ -54,3 +54,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 
 ## Best configs (runbooks/)
 - copy+novel: kat-pc3.sh (pipeline x dspark+ngram w8)
+
+## V70 — Head finetune lane closed (2026-08-19)
+- Trainer bugs found+fixed: ggml ne1-fastest deq permutation (advisory,
+  confirmed: step-0 0.000 -> 0.219 after fix), k_norm skipped, q-gate
+  geometry (32 heads no gate — dims prove it), device placement.
+- Retrained clean: VAL acc 0.697 held-out (base 0.219 same metric).
+- A/B CONTROL (identical stack/flags/prompts, n=3 each):
+    ft head:   acc 0.21, tg 10.7-11.6
+    base head: acc 0.195, tg 7.7-11.1
+  => IDENTICAL. Finetune wash on novel. The 0.30-0.37 "novel baseline"
+  was a different protocol (copy-agentic prompts); true novel-story
+  acceptance floor ~0.20 both heads.
+- Root cause of wash: 100-sample capture (6% of 6230) covers too little
+  of KAT's novel distribution; the head saturates what it saw.
+- VERDICT: acceptance lever via head finetune = CLOSED at this data
+  scale. Do not retrain without full capture.
+- Server-protocol traps logged: TIME_WAIT zombie curl "UP", taskkill
+  //F arg mangling, pipeline buffer-fallback under RAM pressure
+  (contaminates benches — always grep for sched_reserve failure).
