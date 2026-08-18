@@ -1422,3 +1422,16 @@ LEVERS WITHOUT TREE-VERIFY (engine supports linear chains only):
      same lane as NInfer/Bole tree kernels; noted as the full version.
 TEST NOW: ngram-only deep chain sweep (n-max 12/16/24, head p-min 0.75)
   on copy — isolates the spine-depth variable.
+
+## V68 CATS (user find) — memory-limited cascade framework
+Cascaded Adaptive Tree Speculation: verification + correction cascaded
+BY MEMORY BUDGET AND OFFLOAD PATTERN; peak memory = target alone;
+up to 5.08x on edge. Validates: (a) our cascade-v2 direction (queued
+test), (b) adaptive verify depth vs memory state (formalizes our V46
+width findings), (c) self-speculation (SS-MoE-style expert-subset
+drafts) to avoid draft-model memory. Synthesis target: cascade-v2 +
+GOOSE spine + CATS memory-adaptive depth = the full memory-aware
+spec stack.
+CAPTURE STATE: full run infeasible (160GB >> 26GB free); banked 100
+samples (3GB, valid offsets) — enough for pipeline-validating
+finetune; scale later by chunked capture or streaming consumption.
