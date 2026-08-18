@@ -90,3 +90,8 @@ compute 18ms. 566MB/62ms = **9.1GB/s effective vs ~55GB/s available**.
 - quality: coherent, NOT bit-exact vs AR (KV-inject numerics); documented
 - all negatives recorded (ngld-all, conf-min, union-v2 ladder, width-null
   confound identified + deconfounded)
+
+## 2026-08-18 — TRUE-COPY protocol final: 56.0 med/59.5 peak e2e, 68.5 decode
+- acceptance 0.951, mean accepted len 21-24/step on verbatim-reproduction
+- 5.6x stock AR e2e; agent-relevant workload class (file regen/echo)
+- 100 open: needs Bole-class verify fusion (33ms/row -> ~10) or SPD draft hiding

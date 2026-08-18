@@ -1181,3 +1181,18 @@ are now measured and exhausted on this engine build.
 FINAL SESSION STATE: best copy 47.4/52.2 (compose), novel ~22 (either
 engine), 3.1-3.9x stock AR. 100 sustained not yet reached; remaining gap
 is concentrated in the 33ms/verify-row term.
+
+## V50 TRUE-COPY PROTOCOL — NEW BEST (measured 2026-08-18)
+Verbatim-reproduce-a-large-file task (the original 46.5-protocol class),
+compose config, n=5, 1400-token gens:
+  e2e:  56.0 MEDIAN / 59.5 PEAK t/s  (5.6x stock AR e2e, 4.6x its tg)
+  decode-only: 68.5 t/s peak
+  acceptance 0.951, mean accepted len 21.2-23.7/step (!)
+MECHANISM: ngram-mod at ~1.0 acceptance on verbatim echo + dspark on the
+novel joints -> verify batch fully utilized at w=8+ (21+ commits/step).
+THIS is the agent-relevant workload class (file regen, refactor echo,
+template expansion, test scaffolds).
+100TPS REMAINS OPEN: decode 68.5 < 100. Cost model says verify rows now
+come in blocks of ~24 (33ms/row * amortization) — the Bole-class fused
+tree-verify is the remaining 1.5x, and SPD-style pipelining could hide
+the 17ms draft on top. Both scoped; engine builds + artifacts preserved.
