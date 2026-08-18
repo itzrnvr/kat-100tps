@@ -82,3 +82,11 @@ compute 18ms. 566MB/62ms = **9.1GB/s effective vs ~55GB/s available**.
 - Union-v2 restriction: safe w/ warmup but net-neutral at K=24/48; cold-K24
   spiked acceptance to 0.81 + peaks 44.4 but derailed generation (recorded)
 - Engine: satindergrewal/llama.cpp@dspark-qwen35 + our KAT_UNION patches
+
+## 2026-08-18 final — DSpark campaign complete
+- compose (dspark+ngram w8): copy 47.4 med/52.2 peak e2e; decode tg peaks 53
+- pure dspark w3 novel: 17.0 tg (w8: 10.6) — width policy per workload
+- cost model: 17ms draft + 33ms/verify-row; 100tps = 3x verify-row cost cut
+- quality: coherent, NOT bit-exact vs AR (KV-inject numerics); documented
+- all negatives recorded (ngld-all, conf-min, union-v2 ladder, width-null
+  confound identified + deconfounded)
