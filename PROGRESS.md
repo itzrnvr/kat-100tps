@@ -1,0 +1,56 @@
+# PROGRESS LOG — KAT 100 t/s Campaign
+Running findings ledger. Newest last. Every entry: measured, mechanism, verdict.
+Goal: novel + copy BOTH 70-100+ t/s at Q4_K quality.
+
+## System
+RTX 3070 Ti 8GB (sm_86, PCIe4 x8 ~16GB/s) + 31GB DDR5 RAM (~55GB/s).
+KAT-Coder-V2.5-Dev 35B MoE (40L x 256 experts top-8, GDN hybrid).
+Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
+
+## Milestones (measured)
+- stock AR: 12.3 t/s | lucebox AR: 22.4 | CQ3+gbuzhf spec: copy 46.5
+- DSpark v2 head (Koopah, cross-model from Qwen3.6-35B): acc 0.4-0.5 novel
+- DSpark + ngram compose: copy 47.4/52.2 e2e, 68.5tg | novel 17-18.6
+- PIPELINE x COMPOSE (V64): copy 70.0tg/58.1 e2e | novel 22.9tg  <- CURRENT
+- mechanics: 82 GPU<->CPU splits/fwd; step=17ms draft + 33ms/verify-row;
+  verify cost superlinear in width (expert fragmentation)
+
+## Findings (what doing what — all profiled)
+1. Fate prefetch v1: 5x WORSE (sync D2H in decode loop = self-stall).
+   Technique not wrong — placement was. v2 designed (async, arbiter).
+2. Union restriction v1: acc HELD 0.79 but 9 graph-ops/layer ate gains.
+   v3 FUSED (1 static add/layer): overhead gone; K32 neutral on these
+   workloads (keep in tree; the fix mattered).
+3. Width: w=8 optimal for compose; w12/16 collapse (superlinear verify).
+   GOOSE paper: spine should be ngram-deep not head-deep -> sweep queued.
+4. CQ4 (Q3_K experts): PPL 7.35 vs 5.71 Q4K floor -> DISCARDED (quality
+   gate is binding; byte-cut at <4.5bpw is off-limits).
+5. JetSpec causal head: converted clean, but fork's dflash runtime is
+   non-causal-marginal-shaped; head outputs input-independent noise.
+   Control (Koopah head same binary): acc 0.27, confident -> runtime
+   verdict, not conversion bug. Needs causal decoder-graph feature.
+6. Cascade v1 (length cap): no-op (ngram never exceeded horizon).
+   v2 (per-token logit-scored truncation) BUILT, untested (env gate).
+7. Load race: RAM-pressure driven (4GB free=100% crash, 17GB=zero).
+   Operational rule: >10GB free before -md launches.
+8. Pipeline + no-big-offload guard: AR +33%; guard BREAKS draft-context
+   fit -> compose runs pipeline WITHOUT guard (works, faster).
+9. Capture->finetune lane: DSCT 6230 samples; disk caps capture at 100
+   samples (3GB) — enough to validate. Trainer: fc+L4/L5 (151M params).
+   ft pass1: acc 0.19->1.00 train; save crashed (attr bug), fixed,
+   rerun with held-out val split in flight.
+
+## In flight
+- ft pass2 (val-split, 20min) -> export GGUF -> serve -> novel bench.
+  If engine acc follows (0.5->0.7+): novel scales proportionally.
+
+## Queued (user directive: no discards, solve issues)
+- GOOSE ngram-spine depth sweep (n-max 12/16/24 ngram-only)
+- Cascade v2 bench (built)
+- Fate v2: async arbiter prefetch (design in DESIGN.md V58-adjacent)
+- Hot-expert VRAM cache (SOFT_MAX readback infra built; needs fork port)
+- Expert replication (2605.11537) on hot set
+- CATS memory-adaptive verify depth | Bole tree kernels | NInfer port
+
+## Best configs (runbooks/)
+- copy+novel: kat-pc3.sh (pipeline x dspark+ngram w8)
