@@ -95,3 +95,5 @@ compute 18ms. 566MB/62ms = **9.1GB/s effective vs ~55GB/s available**.
 - acceptance 0.951, mean accepted len 21-24/step on verbatim-reproduction
 - 5.6x stock AR e2e; agent-relevant workload class (file regen/echo)
 - 100 open: needs Bole-class verify fusion (33ms/row -> ~10) or SPD draft hiding
+
+## 2026-08-18 V51 — width sweep: w8 compose optimal (68.5 tg); w12/w16 collapse (~31-33)

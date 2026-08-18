@@ -1196,3 +1196,16 @@ template expansion, test scaffolds).
 come in blocks of ~24 (33ms/row * amortization) — the Bole-class fused
 tree-verify is the remaining 1.5x, and SPD-style pipelining could hide
 the 17ms draft on top. Both scoped; engine builds + artifacts preserved.
+
+## V51 WIDTH-SWEEP FINAL — W=8 COMPOSE IS THE OPTIMUM (measured)
+True-copy protocol, decode tg peaks, only width/params varied:
+  w=8  (p-min .75, ngram 8/24/48): 68.5 tg | 56.0/59.5 e2e | mean-len 24
+  w=12 (p-min .70, ngram max 32):  ~31.5   | mean-len 29
+  w=16 (p-min .60, ngram 48/64):   ~32.8   | mean-len 33
+Wider drafting raises commits/step but verify-row cost dominates
+(superlinear: wider batches fragment across MORE distinct experts per
+row — the M~1.4 effect compounds). Cost model V49 confirmed again.
+FINAL BEST CONFIG = kat-compose.sh (w8 recipe). Campaign config space
+EXHAUSTED on this engine build. Remaining path to 100 (scoped, not
+built): Bole-class fused GDN tree-verify (33ms/row -> ~10) OR SPD-style
+draft/verify pipelining. Both target the same measured bottleneck.
