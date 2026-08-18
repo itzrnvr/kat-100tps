@@ -1209,3 +1209,114 @@ FINAL BEST CONFIG = kat-compose.sh (w8 recipe). Campaign config space
 EXHAUSTED on this engine build. Remaining path to 100 (scoped, not
 built): Bole-class fused GDN tree-verify (33ms/row -> ~10) OR SPD-style
 draft/verify pipelining. Both target the same measured bottleneck.
+
+## V52 SPLIT-CHATTER DISCOVERY + PIPELINE TEST (2026-08-18)
+MEASURED: -cmoe runs at 82 graph splits per bs=1 forward (sched_reserve
+banner). Each split = serialized GPU<->CPU sync round trip (WDDM). At
+12.3 t/s AR (81ms/step), sync overhead plausibly dominates the 33ms/row
+verify term in V49 — the cost model's "per-row" component is partly
+PER-SPLIT CHATTER.
+TEST: KAT_PIPELINE env gate added (llama-context.cpp:365) forcing
+ggml_backend_sched pipeline_parallel for tensor-override configs.
+RESULT: gate works but pipelined reserve FAILS — 69GB buffer request
+(n_copies=4 x unified graph incl. CPU expert nodes all placed on CUDA0).
+Upstream pipeline path was built for multi-GPU layer splits, not the
+-cmoe override topology. Needs: split-aware gallocr reserve (real
+scheduler work, not a flag) OR op-offload=False variants.
+STATE: recorded as open thread w/ exact failure signature. CQ4 build
+nearing completion -> quality gate first.
+
+## V54 NOVEL-TEXT 100 TPS — HONEST ROADMAP (user refocus 2026-08-18)
+User: 100 t/s NOVEL text is the target (copy doesn't count). Current
+novel: 17-22 t/s. The ladder to 100 on novel (measured constraints):
+  acceptance on novel (KAT, dspark-v2 head): 0.71/0.51/0.31/0.22...
+  -> mean len 3.3 commits/step. Novel t/s = commits / step_time.
+  step_time today ~= 17ms draft + 33ms/row x rows.
+THREE MULTIPLYING LEVERS (all needed):
+  1. FEWER BYTES/ROW: CQ4 (Q3_K experts, building) -> 33->~25ms/row.
+     Quality-gated (PPL <=+0.05 vs Q4K floor) or discarded.
+  2. HIGHER ACCEPTANCE: dspark head TRAINED ON KAT itself (not the
+     Qwen3.6 sibling). satgeze's DeepSpec gguf-capture tool validates
+     cosine 0.9998 vs HF pipeline; trained-for-target heads add the
+     deep-position acceptance novel needs (0.31->0.5+ at pos 3 = mean
+     len 3.3->4.5+). ~1-2 day training lane, zero big-model training.
+  3. OVERLAP: draft hidden behind verify (SPD-style) or split-pipeline.
+     Pipeline reserve fails on our topology (69GB at bs=512 pp graph);
+     NEXT: diagnostic print of per-backend pipelined-reserve sizes to
+     find the real inflation (blind patch reverted).
+MATH: CQ4(25ms/row) + KAT-head(len 4.5) + serial = (17+112)/4.5 = 29
+  ... still short. Need row cost ~8ms (bandwidth floor at Q3: ~19ms/row
+  pure read; 8ms only if expert reads batch across rows — the union-K
+  idea APPLIES HERE: cap distinct experts/verify at ~16 -> 1.1GB/step).
+STACK: CQ4 + KAT-head + union-K16 + draft overlap ~= (17+~45)/4.5
+  ~= 100+. Each piece measured/scoped; none require big-model training.
+
+## V55 PIPELINE 69GB MYSTERY SOLVED (KAT_ALLOC_DIAG, measured)
+The pipelined reserve's 69GB CUDA request = EXPERT WEIGHT VIEWS being
+treated as split-boundary copies: 40 layers x 3 exp tensors x 144MiB x
+4 copies (n_copies=4). The scheduler materializes split-input tensors
+on the DESTINATION backend — for real activations that's correct, for
+read-only MoE weights (CPU-resident by design) it's catastrophic.
+FIX SHAPE: in ggml_backend_sched_split_graph, when a split input's
+source buffer is a WEIGHTS-usage host buffer, keep it host-side and use
+async H2D view (the data is identical every step; per-copy duplication
+is pointless). ~20 lines in one function, no cuda graphs.
+IMPACT BOUND: removes the OOM -> pipelining CAN engage -> overlaps the
+82 serialized GPU<->CPU syncs/forward. Novel step ~= 17ms draft +
+(33ms/row x rows) where the 33 includes sync stall; pipelining
+recovers the stall portion only (est 30-50% of it). STACKS with CQ4
+(fewer bytes) and KAT-head (more commits/step).
+
+## V56 PIPELINE BREAKTHROUGH (measured 2026-08-18)
+KAT_NO_BIG_OFFLOAD guard (>32MiB host weights never offloaded — kills the
+69GB per-copy expert materialization) + KAT_PIPELINE=1:
+  pipeline ENGAGES (0 fallbacks), AR novel: 16.4 tg peak / 15.2 e2e
+  vs 12.3 stock AR baseline = +33%. Split pipelining overlaps the
+  82 GPU<->CPU syncs per forward. NO cuda graphs. Stable.
+NEXT TEST: compose with pipelining (does the draft's target-forward
+benefit equally?), then stack with CQ4 when its build lands.
+
+## V57 USER IDEA EVAL: LAYER LOOPING + LOW-RANK EXPERTS (2026-08-18)
+Proposal: 20 layers + loop x2, experts low-rank.
+MATH: looping saves ZERO bytes/token (re-reads same weights per pass;
+bottleneck is bytes not residency). 20L@Q3 ~= 8.8GB still > 8GB VRAM.
+10L@Q3 x4 loops fits (~5GB) and would be ~1ms expert reads at 448GB/s
+BUT 10-layer depth-sharing on a non-loop-trained model = word salad
+(own Nanbeige campaign: even loop-trained model needed per-loop LoRA +
+gating; KAT retraining violates no-big-training rule). Low-rank experts:
+measured dead end in E0-era work (SVD class loses to quant sub-4-bit;
+experts tolerate factorization worse than dense).
+SURVIVING VARIANT — HOT-EXPERT VRAM CACHE (queued next after CQ4):
+  expert usage is heavy-tailed; pin top ~2-3GB of hot experts in
+  leftover VRAM (60GB/s x unused headroom... no, 448GB/s VRAM read),
+  cold in RAM. Covers est 40-60% of expert reads at VRAM speed with
+  ZERO weight changes / zero retraining (WiSP/SMoE class from paper
+  dump). Implementation: placement heuristic in -cmoe tensor overrides
+  or engine-side expert pin table.
+
+## V58 JETSPEC HEAD + LOAD RACE STATUS (2026-08-18)
+JetSpec/jetspec-Qwen3.6-35B-A3B head converted (build_jetspec.py):
+  8-layer causal draft, fc 41.9MB, our Q6_K quant (rel-err 0.0202
+  verified), tokenizer spliced from Koopah draft, all fork metadata
+  keys fixed (dflash arch, target_layers array, causal=true BOOL,
+  bare tensor names fc.weight / enc.output_norm.weight).
+FIRST RUN: acceptance 0.000 — diagnosed TWO semantic bugs in fork:
+  (a) HF output_hidden[L] == llama layer_inp[L+1] (off-by-one capture)
+  (b) fork hard-forces non-causal attn on dflash drafts; JetSpec head
+      is causal_head:true
+FIX (built, testing): KAT_JETSPEC env -> extract at id+1, causal on.
+LOAD RACE: -ngld all configs hit 'invalid vector subscript' up to
+100% of attempts (fit-path double-load of draft GGUF is non-
+idempotent; VRAM state-dependent). BLOCKER for GPU-draft. CPU-draft
+(dspark v2) bypasses it (~50% race, retry wins).
+PPL GATE: rerun in flight (cq4 full log pending).
+
+## V59 LOAD RACE ROOT CAUSE = RAM PRESSURE (2026-08-18)
+The 'invalid vector subscript' draft-load crash correlates with FREE RAM
+(4.1GB free = ~100% crash; 9GB+ = ~50%; 15GB+ = rare). NOT the measurement
+pass (KAT_NO_MEASURE confirmed skipping it; still crashed). The dual-load
+page-cache under memory pressure trips a vector bounds bug in the fork's
+loader. Operational rule: >10GB free before -md launches; kill PPL/builds
+first. All earlier "race" observations consistent with this.
+QUEUE (memory-gated): (1) PPL CQ4 gate (~1h); (2) JetSpec causal-head
+test at high free RAM; (3) if acceptance >0.5 novel -> compose + bench.
