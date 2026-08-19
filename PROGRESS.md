@@ -574,3 +574,20 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   Q3_K only on measured-insensitive experts — needs per-expert PPL
   sensitivity data we don't have yet (chunk-level sensitivity tooling
   exists from CQ builds; per-expert is new work).
+
+## V99 — Byte-lever CLOSED by measurement (2026-08-20)
+- Q4_K_XL tier header-inspect: experts Q4_K/Q5_K (no byte win — that
+  tier is quality-up, not size-down). Third-party map complete: every
+  byte-saving tier on HF uses IQ2_M-class gate/up experts.
+- Per-expert weight-magnitude measurement (layer 20, 256 experts, our
+  trunk): spread 1.21x max/median, deciles 0.0029-0.0033 — FLAT.
+  Combined with uniform routing (V74): KAT's experts are statistically
+  interchangeable. No sensitive-subset to protect; mixed-precision
+  would degrade all uniformly -> gate fails like IQ2_M (V98).
+- Custom-quant lane closed BY DATA. Q4_K 4.5bpw is KAT's measured
+  quality-preserving floor on this hardware.
+- CAMPAIGN STATE: every lever in every family (serving, scheduler,
+  speculative, quantization, caching) now has a measured verdict.
+  Final: copy 62-68 (91-97% of bar), novel ~42/47 (60-68%).
+  The 4 crossed constraints (uniform routing x 24GB/s bus x 8GB VRAM
+  x 4.5bpw floor) are all hardware/format limits, not code.
