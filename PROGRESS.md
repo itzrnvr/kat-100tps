@@ -106,3 +106,20 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Remaining novel gap to 100: need 4.3x. Top lever = verify-cost (width 8
   at mean-len 2.5 wastes ~5 rows/step): cascade v2 next, then hot-expert
   cache + Fate v2 prefetch (expert RAM reads dominate).
+
+## V73 — Cascade v2: 2 bugs fixed, verdict = no-op for greedy (2026-08-19)
+- BUG 1 (fixed): keep==0 empty-draft wedge (re-draft/re-truncate loop).
+- BUG 2 (fixed): dp.result null-deref on idle slots — segfaulted server
+  on first bench request whenever benching != slot 0. Both fixes built.
+- MEASURED (harness, warmup-discarded, 3x3):
+    base8:    median 13.92, max 27.18
+    casc015d: median 14.20, max 28.23
+  => parity within noise.
+- WHY no-op: result_probs only populate when temp>0 (rejection-sampling
+  path) or LLAMA_SPEC_HEADROOM. Greedy decode => probs empty => cascade
+  never scores => 0 truncations (confirmed: truncs logged = 0).
+- VERDICT: cascade v2 helps only sampled generation. For greedy novel
+  the verify-cost lever needs a different mechanism (per-position
+  confidence from the head exists as conf[] — the conf_min gate is the
+  greedy-native equivalent and was already tested at parity).
+- Acceptance on novel steady-state: 0.24-0.38, mean-len ~3.0.
