@@ -608,3 +608,10 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - CAMPAIGN COMPLETE at V100: 31 versioned findings, every family
   measured, every door either opened (serving optimizations, 5.1x copy)
   or closed with data.
+
+## V101 — W=6: negative; width curve fully bracketed (2026-08-20)
+- W=6 (4-pass warmup, 4 trials): novel 8.5-19.4, copy 7.1-15.2,
+  acceptance 0.64-0.75 — worse than W4 on copy AND W3 on novel.
+- Complete width curve now: W1 < W2 < W3(novel peak 63) | W4(copy 62-68)
+  > W5 > W6 > W8. Single-crossover optimum confirmed from both sides.
+- This was the last untested width. Config space exhaustively mapped.
