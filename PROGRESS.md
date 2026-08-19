@@ -527,3 +527,19 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Real novel levers are NOT code: (a) VRAM capacity for expert
   residency, (b) sub-Q4_K quant passing PPL gates, (c) routing
   correlation. Soak passes do not move the median materially.
+
+## V96 — 20-pass longsoak (W=4): full data, final regime map (2026-08-20)
+- 20 warmup passes, 8 trials, W=4, idle machine:
+    t1-t4: novel 18->40 (climb), copy 51-57
+    t5-t8: novel 37-47 sustained, copy 52-55 (best c=56.9)
+    acceptance 0.81-1.00
+- LONG-SOAK VERDICT: deeper soak lifts novel late-trials to ~42 median
+  (from ~28 at 4-pass) but copy settles LOWER (54 vs 62-68 at 4-pass).
+  No config reaches 70 sustained on either workload.
+- FINAL REGIME MAP (all honest):
+    copy best: W=4, 4-pass warm — 62-68 sustained (91-97% of bar)
+    novel best sustained: W=4, 20-pass soak — ~42 median, 47 peak
+    novel best single: 63-67 (rare, non-reproducing)
+  Novel ceiling ~47-67 depending on cache luck; bar 70.
+- The soak experiment is exhausted. Novel 70+ requires the structural
+  levers (VRAM/quant/routing). Everything else measured.
