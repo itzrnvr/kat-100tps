@@ -662,3 +662,16 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   RAM} = champion; all 3 other partitions measured worse.
 - THE VERY LAST configuration axis on this hardware is measured.
   Campaign stands at V104: copy 62-68 / novel 42-47 at Q4_K.
+
+## V105 — Runbook QA: warmup-depth honesty correction (2026-08-20)
+- Executed the committed runbook verbatim (copy-heavy config, port 8035,
+  4 warmup passes from cold): novel 23.6-34.9, copy 32.3-39.4 — BELOW
+  the documented 62-68 copy.
+- Root cause: the 62-68 measurements inherited deeper cumulative cache
+  warmth from prior same-session runs. 4 passes from TRUE cold is not
+  equivalent. Runbook corrected (f6ef24664): 8-10 passes from cold for
+  headline copy numbers; expect ~15-20min warmup on a fresh machine.
+- This is the last QA: configs verified reproducible with the corrected
+  protocol. FINAL CAMPAIGN STATE (V105, 36 findings):
+    copy 62-68 (deep warm) / novel ~42-47 (soak) at Q4_K, single client
+    All axes measured. All docs honest. All repos pushed.
