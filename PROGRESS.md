@@ -615,3 +615,20 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Complete width curve now: W1 < W2 < W3(novel peak 63) | W4(copy 62-68)
   > W5 > W6 > W8. Single-crossover optimum confirmed from both sides.
 - This was the last untested width. Config space exhaustively mapped.
+
+## V102 — Concurrent serving: negative; EVERY dimension now measured (2026-08-20)
+- 4 parallel slots (-np 4), 2x novel clients: 23.5 t/s aggregate
+  (per-client 15.2/12.3). 4x mixed: 20.6 aggregate (per-client 4.8-10.5).
+  BOTH BELOW single-stream ~42 — concurrency is strictly negative.
+- Mechanism: uniform routing again. Concurrent clients read disjoint
+  experts; no sharing, no verify-batch amortization; slot splitting
+  shrinks each client's batch below optimal width.
+- CONCLUSION: "100 t/s aggregate via parallel clients" is also closed.
+  The ONLY single-server optimum is single-client.
+- CAMPAIGN TRULY COMPLETE: serving (widths W1-W8, threads t8-t24,
+  warmup depths, np 1-4), speculative (4 drafter types + mixes),
+  quantization (Q3/Q4/IQ tiers, per-expert), scheduler (pipeline,
+  adaptive width, event waits), hardware (channels, bus, VRAM fits),
+  concurrency (np2/np4) — every axis measured, every verdict recorded.
+- FINAL: copy 62-68 sustained / novel ~42-47 at Q4_K floor. 100 t/s
+  requires hardware change (single decisive lever: >20GB VRAM GPU).
