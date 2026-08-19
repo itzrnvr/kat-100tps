@@ -472,3 +472,21 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   resident in ~400GB/s memory (needs >8GB VRAM or LPDDR-class change),
   or a quantization breakthrough below Q4_K that passes PPL gates.
   Both are hardware/format-generation changes, not code.
+
+## V93 — MTP-GPU: perfect acceptance, same wall (2026-08-20)
+- Fixed donor MTP head with its own experts GPU-resident (-ncmoe 40),
+  drafts now essentially free AND acceptance 0.64-1.00 (best ever
+  measured on this system).
+- RESULT: W=4 novel 11.0/8.5/8.4 copy 14.8; W=8 novel 6.4-7.3 copy 9.3.
+  THROUGHPUT UNCHANGED TO WORSE despite near-perfect drafting.
+- THE CLOSING INSIGHT — uniform routing defeats batch amortization:
+  with entropy 15.7/16.1, a verify batch of N rows touches ~min(8N,256)
+  DISTINCT experts per layer. 4 rows ≈ up to 32 experts vs 8 for one
+  token: 4x the RAM reads for 4x the commits. ZERO net gain per
+  committed token. Speculative decoding cannot beat the RAM wall under
+  uniform routing — it can only win when drafts are free (GPU) AND
+  reads amortize (hot/correlated routing). KAT has neither lever.
+- CAMPAIGN CLOSED ON PHYSICS. Final: novel 28.2 med/58.6 peak, copy
+  55.4, all at Q4_K, clean upstream tree. 100 t/s requires hardware
+  (VRAM capacity for full expert residency) or format-generation
+  (sub-Q4_K with PPL pass) changes.
