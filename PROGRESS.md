@@ -384,3 +384,24 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - ROAD: matching 33+ on gypsy-dragon requires either porting the older
   scheduler's split handling (deep, risky) or finding upstream-level
   knobs. Recorded as open item.
+
+## V89 — Split-level timing: the pipeline mechanism measured (2026-08-20)
+- Added KAT_SPLIT_TIME instrumentation to compute_splits (per-backend
+  us accumulation, 200-call report; committed as diagnostics).
+- Split topology IDENTICAL both engines (telemetry: 82 TG splits target,
+  2 draft; nodes equal) -> difference is split EXECUTION, not count.
+- Per-call breakdown (200-call means, spec stack W=3):
+                 pipe-OFF   pipe-ON    delta
+    CPU compute   45.7ms     69.8ms    +24.2   (+53%)
+    GPU compute    6.7ms      7.1ms     +0.4
+    copies/other 152.4ms     47.4ms  -105.1   (3.2x fewer copies!)
+    total        204.8ms    124.3ms    -80.5
+  Pipeline DOES deliver the copy elimination. But end-to-end t/s is
+  11 vs 26: the compute_splits timers miss the stall that moves to
+  event/synchronize calls downstream (async return shifts the wait).
+  CPU +24ms/call is the event-wait serialization on CPU splits.
+- VERDICT: lmdspark's scheduler-era win = old event handling on the
+  CPU-split path. Upstream's newer path pays per-split event waits
+  that exceed the copy savings at this 22-split/call topology.
+- NEXT (open): eliminate the per-CPU-split event wait (batch waits,
+  or cur_copy pinning) — the 105ms/call copy saving is real headroom.
