@@ -145,3 +145,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   quality needs bytes/token halved beyond what quantization floor allows.
 - Remaining levers: (a) width economics under clean protocol (fewer
   wasted rows), (b) Fate v2 overlap (bandwidth pipelining, not locality).
+
+## V75 — WIDTH CURVE (clean protocol): W=3 optimal, +78% novel (2026-08-19)
+- Harness: warmup discarded, 3 trials x 3 novel prompts, streaming decode
+  rate. Markov active for all W<=7 (block<=8).
+    W=1: median 20.18 (max 33.7)
+    W=2: median 21.24 (max 31.7)
+    W=3: median 24.71 (max 52.6)  <- OPTIMAL
+    W=4: median 19.53 (max 27.2)
+    W=8: median 13.92 (max 28.2)  <- old flagship
+- Novel acceptance ~0.25-0.38, mean-len ~3.0 => W=3 matches actual commit
+  length; every wider step buys rejected rows at 33ms each.
+- Prompt-dependent spread: story prompts (repetitive structure, ngram
+  hits) reach 30-52; hardest novel prompt floors 16-21 at any width
+  (pure RAM-bandwidth bound).
+- OLD width sweep (V66-era "w=8 optimal") was measured under the
+  contaminated protocol + pre-warmup; superseded.
+- NEXT: W=3 confirm (5 trials), copy bench at W=3 (copy wants wide for
+  its 21-24 mean-len — expect regression; if so, adaptive width is the
+  answer, lucebox has adaptive_verify_width.h to port).
