@@ -263,3 +263,20 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   control plane / DeltaNet transform path changes what h_nextn feeds
   the head). Next diagnostic = logits dump (head top-k vs target top-k
   on same context) — queued, not started.
+
+## V83 — q||gate packing BOTH ways benched: 0% each; head-side CLOSED (2026-08-19)
+- attn_q repacked per-head [q||gate] interleaved (engine view_3d
+  convention) -> 0.00000. Donor-as-is concat halves -> 0.00000.
+- Every head-side variable is now individually closed:
+    dense matmul orientation (fixed, verified)
+    expert layout (fixed, expert-major, verified 0.997)
+    router orientation (both ways benched)
+    q||gate packing (both ways benched)
+  All against the byte-verified gbuzhf donor, on the same engine that
+  accepts 0.57-0.75 with their trunk. attn_q left in donor-as-is form.
+- SURVIVING HYPOTHESIS (only): trunk h-contract. CQ2-lineage trunk's
+  h_nextn (feature the head consumes) is misaligned for the donor head.
+  Next diagnostic when pursued: logits dump (head top-k vs target
+  top-k, same context) to split extraction-path vs value drift.
+- RECAP for the record: dspark head remains the only working novel
+  drafter on our trunk (0.36-0.82 acceptance, 25+ t/s novel).
