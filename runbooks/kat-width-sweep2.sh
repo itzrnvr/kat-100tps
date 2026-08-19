@@ -1,7 +1,7 @@
 #!/bin/bash
-# PURPOSE: Novel verify-width sweep with markov ON (n-max <= 7).
-#          Cost model: step = 17ms draft + 33ms/row; novel mean-len ~2.5.
-LOG=C:/merge/train/dswidth.log
+# PURPOSE: Complete width curve W=5,6 (W=7 clean: 17.5-21.0; W=3/4 suspect).
+#          Serial, RAM-gated, one server at a time.
+LOG=C:/merge/train/dswidth2.log
 SRV=/c/src/lmdspark/build/bin/Release/llama-server.exe
 
 wait_ram () {
@@ -14,7 +14,10 @@ wait_ram () {
   return 1
 }
 
-for W in 3 4 5 6 7; do
+powershell -NoProfile -c "Stop-Process -Name llama-server -Force -ErrorAction SilentlyContinue" 2>/dev/null
+sleep 6
+
+for W in 5 6 7; do
   wait_ram || { echo "RAM GATE FAILED W=$W" >> $LOG; continue; }
   for i in $(seq 1 6); do
     KAT_PIPELINE=1 "$SRV" -m C:/merge/KAT-CQ3-MTP.gguf \
@@ -30,7 +33,7 @@ for W in 3 4 5 6 7; do
     fi
   done
   (cd /d/merge/train && python bench_novel.py 2>&1 | grep tg= | sed "s/^/W=$W /" >> $LOG)
-  powershell -NoProfile -c "Stop-Process -Name llama-server -Force -ErrorAction SilentlyContinue"
+  powershell -NoProfile -c "Stop-Process -Name llama-server -Force -ErrorAction SilentlyContinue" 2>/dev/null
   sleep 6
 done
 echo SWEEP_DONE >> $LOG

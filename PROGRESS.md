@@ -87,3 +87,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   showed 5.3-8.1 while solo window showed 16.5-21.3) — always serialize.
 - Note: mk7 differs two ways (markov + width 7); width sweep next to
   attribute. Constraint: markov requires n-max <= 7.
+
+## V72 — markov claim FALSIFIED; harness protocol established (2026-08-19)
+- Serial python harness (launch->bench->kill, no bash races): nmax=7 vs 8,
+  3 trials x 3 novel prompts each.
+- RESULT: identical within noise. nmax=7 median 13.10 (max 21.11);
+  nmax=8 median 12.97 (max 23.19). BOTH show cold~11 -> warm~21-23 trend.
+- V71's "+60% from markov" was WARM-SERVER vs COLD-SERVER confound. Real
+  effect of markov bias on novel: none measurable. Claim retracted.
+- Warmup = mmap page-in of 19.8GB experts (first prompts fault from disk).
+  Steady-state novel decode = 21-23 t/s. Matches old 22.9 ledger figure.
+- PROTOCOL RULES (now enforced): (1) streaming decode-phase timing only,
+  (2) discard first trial after server load (page-in), (3) one client,
+  (4) python-subprocess launches (bash shim silently blocks the exe —
+  "command not found" with exit 0 was DLL/env masking).
+- ENV FIX: cudart64_12/cublas64_12/cublasLt64_12 copied beside exe
+  (fresh shells lost CUDA PATH -> ggml-cuda.dll unloadable).
+- Remaining novel gap to 100: need 4.3x. Top lever = verify-cost (width 8
+  at mean-len 2.5 wastes ~5 rows/step): cascade v2 next, then hot-expert
+  cache + Fate v2 prefetch (expert RAM reads dominate).
