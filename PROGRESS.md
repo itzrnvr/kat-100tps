@@ -347,3 +347,21 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   trunk was never the problem; the donor file's norms were.
 - WHAT THIS UNLOCKS: 1-layer draft head (vs dspark's 6-layer) at
   0.5-0.8 acceptance — cheaper per draft, likely faster novel t/s.
+
+## V87 — MTP head-to-head vs dspark: dspark wins (2026-08-19)
+- MTP head (working, 0.46-0.81 acc) throughput, clean env, t12:
+    W=2: novel 4.7-9.0,  copy 5.8
+    W=4: novel 14.9-16.0, copy 22.4
+- dspark reference (same trunk class, W=3): novel 25.5/21.5/17.9, copy 32.5
+- WHY MTP LOSES despite matching acceptance: the MTP draft layer is a
+  full MoE-256 block routing through the SAME RAM-resident expert pool
+  path as the target — each draft round costs a real expert pass.
+  dspark's 6-layer head is a small standalone model (556MB, GPU-resident,
+  own context) -> drafts nearly free; verify dominates, as measured.
+- VERDICT: for THIS trunk, dspark remains the best novel drafter.
+  The fixed MTP graft (with gbuzhf norms) is banked and works — useful
+  for any future single-model GGUF (no -md second file needed) or as
+  a baseline drafter for stock-numerics trunks.
+- Model file state: C:/merge/KAT-CQ3-MTP.gguf now carries the WORKING
+  head (17 tensors byte-copied from gbuzhf + our Q4 experts). AR/PPL
+  unaffected (head tensors unused by AR path).
