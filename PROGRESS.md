@@ -207,3 +207,12 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
       >> 8GB VRAM).
 - STATUS: novel 33.3 med/66.1 peak, copy 51.5 peak at Q4_K quality —
   ~2-3x from 100 by pure hardware ceiling, absent architecture change.
+
+## V80 — FINAL CONFIG MATRIX (t12) (2026-08-19)
+- W=3 t12 (UNIVERSAL BEST): novel med 33.3 / peak 66.1; copy 27.6-51.5
+- W=8 t12 (copy-only): copy peak 49.9 but median 21-23 (wasted-row tax
+  when ngram misses); novel med 18.6. No reason to prefer it anymore.
+- SINGLE-CONFIG SERVING: W=3, t12, pipeline, dspark+ngram markov-on.
+- Campaign totals vs session start: novel 13.9 -> 33.3 med (+140%),
+  peaks to 66; copy holds 51.5 peak. At Q4_K quality floor throughout.
+- HOLDING for user instruction per directive (no Fate / new lanes).
