@@ -73,3 +73,17 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Server-protocol traps logged: TIME_WAIT zombie curl "UP", taskkill
   //F arg mangling, pipeline buffer-fallback under RAM pressure
   (contaminates benches — always grep for sched_reserve failure).
+
+## V71 — MARKOV BIAS WAS SILENTLY OFF; now engaged (2026-08-19)
+- Found in server log: "DSpark markov bias skipped: runtime block width
+  exceeds trained block_size 8" — EVERY prior run used --spec-draft-n-max 8
+  => anchor+8 = 9 > 8 => bigram bias (the head's acceptance booster)
+  disabled since day one.
+- Fix: n-max 7 => exact 8-token blocks. Skip warning: 0 occurrences.
+- Measured (identical 3-prompt novel protocol, clean single-client):
+    n-max 8 (markov off): tg 10.7-11.6
+    n-max 7 (markov on):  tg 17.5-21.0   (+60-80%)
+- Also: concurrent-client benching CONTAMINATES (two parallel benches
+  showed 5.3-8.1 while solo window showed 16.5-21.3) — always serialize.
+- Note: mk7 differs two ways (markov + width 7); width sweep next to
+  attribute. Constraint: markov requires n-max <= 7.
