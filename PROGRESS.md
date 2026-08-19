@@ -405,3 +405,21 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   that exceed the copy savings at this 22-split/call topology.
 - NEXT (open): eliminate the per-CPU-split event wait (batch waits,
   or cur_copy pinning) — the 105ms/call copy saving is real headroom.
+
+## V90 — Event-wait fix: no effect; stall is structural (2026-08-20)
+- Patched both drain sites in compute_splits (MoE ids fetch + activation
+  copy fallback) to event-wait on the producing backend only.
+- RESULT: 11.1/7.9/7.7 vs 11.3/8.7/7.9 — no change. Committed+reverted
+  (977a45df2), kept in history.
+- CONCLUSION: the pipeline slowdown is NOT per-synchronize drains; it's
+  the copy-rotation boundary itself (n_copies=2 requires both copies
+  drained at every graph-compute exit for result readability). The CPU
+  expert pass (~45ms) cannot run far enough ahead to hide the stall.
+- lmdspark's +40% evidently came from its PRE-MoE-subset copy loop
+  (no ids fetch / bitset scan / expert grouping per split) — a genuinely
+  different code path, not a tunable of the same one.
+- FINAL DISPOSITION of the 26-vs-33 gap:
+  - gypsy-dragon stock (no pipeline): 26/18.6/16.9 novel — RECOMMENDED.
+  - lmdspark w/ pipeline: 33.3 med — keep as the max-speed config for
+    this box (runbook exists). Matching it on upstream requires a
+    restructured CPU-split overlap design, not a patch.
