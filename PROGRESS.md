@@ -328,3 +328,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   stock-numerics trunk (their tier lineage — 0.57-0.75 acceptance
   demonstrated on this engine today), (c) recalibrate head to our h
   (known-hard; gbuzhf's own 2 attempts degraded acceptance even on stock).
+
+## V86 — BREAKTHROUGH: donor MTP head WORKS on our trunk (2026-08-19)
+- ROOT CAUSE OF THE ENTIRE 0% SAGA FOUND: the published
+  original-mtp-head.safetensors carries WRONG/STALE NORM TENSORS.
+  3-way diff (ours vs gbuzhf-working vs donor sf):
+    all matmuls: cos 1.0000 across all three sources (perfect)
+    our experts: 0.997 vs theirs (fine)
+    norms: donor sf vs working build — enorm -0.96, hnorm -0.93,
+           attn_norm -0.37, q/k_norm ~0.975  (!!)
+  gbuzhf's build carries corrected norms; the safetensors export is stale.
+- FIX: byte-copied their 17 matching tensors (all norms + matmuls, Q8)
+  into our CQ3-MTP; our Q4_K experts stay (0.997-equivalent).
+- RESULT: draft-mtp on OUR SMART-QUANT TRUNK:
+    sampled (temp 1.0): 0.735 / 0.550 / 0.462
+    greedy:             0.812 / 0.712
+  Matches gbuzhf's published 48-76%. V85 "trunk h divergence" RETRACTED —
+  trunk was never the problem; the donor file's norms were.
+- WHAT THIS UNLOCKS: 1-layer draft head (vs dspark's 6-layer) at
+  0.5-0.8 acceptance — cheaper per draft, likely faster novel t/s.
