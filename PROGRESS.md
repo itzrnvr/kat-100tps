@@ -591,3 +591,20 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   Final: copy 62-68 (91-97% of bar), novel ~42/47 (60-68%).
   The 4 crossed constraints (uniform routing x 24GB/s bus x 8GB VRAM
   x 4.5bpw floor) are all hardware/format limits, not code.
+
+## V100 — Hardware audit: bus saturated, no hidden headroom (2026-08-20)
+- RAM: 2x16GB DDR5-4800 DUAL-CHANNEL (SMBIOS confirmed both channels
+  populated, 4800MHz configured). Not single-channel.
+- Fresh-allocation streaming re-measure: 21.5GB/s @16 threads (numpy
+  linear-sum), 14.1 GB/s r+w — consistent with V79's 24GB/s ceiling.
+  DDR5-4800 dual-channel theoretical 76.8GB/s; this laptop's
+  power/thermal/clock governance delivers ~24-25% of that sustained.
+- ppl-pass thread scaling on the actual expert workload: t12=124s,
+  t24=120s (+3%, noise). SMT adds nothing; expert reads saturate the
+  bus at 12 physical cores.
+- CONFIRMS: 24GB/s is this machine's real sustained ceiling (not a
+  measurement artifact, not a channel config issue, not thread
+  starvation). All V92-V99 conclusions stand on solid ground.
+- CAMPAIGN COMPLETE at V100: 31 versioned findings, every family
+  measured, every door either opened (serving optimizations, 5.1x copy)
+  or closed with data.
