@@ -554,3 +554,23 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - DUAL-CONFIG RECOMMENDATION STANDS AS FINAL:
     novel-heavy serve: W=3 (deep-soak ~42 median sustained, 47 peak)
     copy-heavy serve:  W=4 (62-68 sustained)
+
+## V98 — UD-IQ4_XS trunk: speed real, quality GATE-FAIL (2026-08-20)
+- Downloaded (parallel-range 24MB/s, sha-verified 9a863f49) and
+  PPL-gated gbuzhf's UD-IQ4_XS tier vs our CQ3 trunk. Identical flags,
+  same corpus (Moby Dick 16 chunks), same day:
+    ours-CQ3:  PPL 3.6952 +/- 0.044  (387s)
+    UD-IQ4_XS: PPL 4.0251 +/- 0.048  (278s)
+    delta = +0.3299 -> FAIL (gate <= +0.05; marginal <= +0.3)
+- Their expert map: gate/up_exps IQ2_M (2.7bpw), down_exps IQ4_NL —
+  ~3.13bpw vs our 4.5. PPL cost on KAT: too high. Every chunk ran
+  hotter (+0.2-0.3 each), not outlier-driven.
+- CONFIRMED along the way: the 39% faster ppl pass (278 vs 387s) proves
+  the byte->bus->time chain converts ~1:1 — the speed ceiling of a
+  3.1bpw expert build is real (novel ~55-60). But under the Q4_K
+  quality floor, this specific cut is disallowed.
+- CONCLUSION: third-party UD tiers fail the gate. The remaining
+  byte-lever is a CUSTOM mixed build: Q4_K where sensitive, IQ4_NL/
+  Q3_K only on measured-insensitive experts — needs per-expert PPL
+  sensitivity data we don't have yet (chunk-level sensitivity tooling
+  exists from CQ builds; per-expert is new work).
