@@ -423,3 +423,30 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   - lmdspark w/ pipeline: 33.3 med — keep as the max-speed config for
     this box (runbook exists). Matching it on upstream requires a
     restructured CPU-split overlap design, not a patch.
+
+## V91 — THE GAP WAS PROTOCOL: gd matches lmdspark (2026-08-20)
+- 5-trial harness on gypsy-dragon (W=3, p-min 0.75, warm discard):
+    trial1 (cold-ish): 27.8/11.2/10.1
+    trial2:            17.7/20.1/12.1
+    trial3 (warm):     46.0/58.6/31.1
+    trial4 (warm):     34.0/57.8/29.7
+    trial5 (warm):     24.7/39.5/28.2
+    FINAL: median 28.22, max 58.56, n=25
+- vs lmdspark same protocol (V76): median 29.06, max 56.72
+- => PARITY. The "26 vs 33" gap was single-spot vs 5-trial-harness
+  measurement mismatch. Both engines reach ~28-29 median / ~57-59 peak.
+- Full arc re-read: V88's "gd 26 vs lmd 33" compared a 1-warmup spot
+  check against a harness median+peak. The pipeline/scheduler
+  investigation (V89/V90) was chasing a protocol artifact — though it
+  produced: 1 real upstream bugfix (degenerate splits), split-timing
+  diagnostics, and the knowledge that forced pipeline HURTS upstream
+  (11 vs 28) — all still valid findings.
+- FINAL ANSWER to "why is lmdspark faster": IT ISN'T, under matched
+  protocol. Both trees deliver ~28-29 median / ~57-59 peak novel on
+  this hardware with dspark head W=3.
+- RECOMMENDED SERVE (clean tree, no envs, single binary class):
+    llama-server -m KAT-CQ3-MTP.gguf -md kat-dspark-v2-q8.gguf
+      --spec-type draft-dspark,ngram-mod --spec-draft-n-max 3
+      --spec-draft-p-min 0.75 --spec-ngram-mod-n-min 8
+      --spec-ngram-mod-n-max 24 --spec-ngram-mod-n-match 48
+      -ngl 99 -cmoe -fa on -ctk q8_0 -ctv q8_0 -t 12 -c 8192
