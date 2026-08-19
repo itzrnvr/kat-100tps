@@ -164,3 +164,8 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - NEXT: W=3 confirm (5 trials), copy bench at W=3 (copy wants wide for
   its 21-24 mean-len — expect regression; if so, adaptive width is the
   answer, lucebox has adaptive_verify_width.h to port).
+
+## V76 — W=3 CONFIRMED (n=15): novel median 29.06, max 56.72 (2026-08-19)
+- 5 trials x 3 prompts: median 29.06 (vs 24.71 first run; min 17.22).
+- Novel stack now: pipeline x dspark+ngram W=3 = 2.1x old flagship median.
+- 56.72 peak = best novel decode ever recorded on this system.
