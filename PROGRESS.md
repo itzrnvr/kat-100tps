@@ -183,3 +183,27 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   Suspects: thread count underfeeding DDR5 (t8 on 16-thread part),
   unvectorized dequant-scalar path, per-row expert gather overhead,
   draft 17ms serialization. Profiling the CPU MoE path next.
+
+## V79 — BANDWIDTH CEILING FOUND; system at hardware limit (2026-08-19)
+- Practical DDR5 bandwidth measured (numpy streaming, this machine):
+    8 threads: 20.0 GB/s | 16 threads: 23.7 GB/s | copy r+w: 14.6 GB/s
+  => ~24 GB/s practical, NOT the 55 GB/s datasheet figure used in all
+  earlier cost models (laptop power/thermal limits).
+- DECOMPOSITION at flagship (W=3, t12, novel 33.3 t/s, mean-len ~3):
+    step ~90ms; verify reads 4 rows x 544MB = 2.2GB
+    2.2GB / 24 GB/s = 89.6ms == measured step time
+  => verify runs at ~100% OF PRACTICAL BANDWIDTH. No kernel overhead
+  left. The "33ms vs 10ms floor" gap was a wrong denominator, not slack.
+- CONSEQUENCES:
+  (a) Software prefetch/Fate-style read tricks: cannot help — the bus
+      is already saturated.
+  (b) Union/VRAM caching of hot experts: DEAD for KAT — uniform routing
+      (V74) means a fixed K-set covers ~0.5% of natural activations;
+      restriction would collapse quality. (Old "K=32 neutral" data was
+      from the dead-observer bug — invalid.)
+  (c) Remaining levers must REDUCE BYTES/READS: lower expert bits (Q4_K
+      floor blocks), higher acceptance (fewer wasted rows), or VRAM
+      residency for ALL experts (impossible: 40L x 256 x 1.7MB = 17.4GB
+      >> 8GB VRAM).
+- STATUS: novel 33.3 med/66.1 peak, copy 51.5 peak at Q4_K quality —
+  ~2-3x from 100 by pure hardware ceiling, absent architecture change.
