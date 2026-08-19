@@ -490,3 +490,23 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   55.4, all at Q4_K, clean upstream tree. 100 t/s requires hardware
   (VRAM capacity for full expert residency) or format-generation
   (sub-Q4_K with PPL pass) changes.
+
+## V94 — Deep-warm regime: near-70 bars, width matrix closed (2026-08-20)
+- DISCOVERY: page-cache depth is a first-class performance variable.
+  After ~10 full-prompt warmup passes, this config enters a deep-warm
+  regime with acceptance 0.90-1.00 (mean-len ~4) — far above the
+  1-warmup acceptance (0.25-0.48) all earlier benches measured.
+- Deep-warm width matrix (4 trials each, 4-pass warmup):
+    W=3: novel 45-58 sustained, peak 63.3; copy 43-48
+    W=4: novel 12-50, peak 49.7; copy 62.6-67.8 sustained (peak 67.8)
+    W=5: WORSE (novel 12-22, copy 21-34) — verify cost exceeds tail
+- CONFIRM run (W=3, lighter warmup): novel peak 67.3, copy peak 63.5
+- BEST-OF vs user bar (70-100 both):
+    novel: 67.3 peak (CONFIRM) — 96% of 70
+    copy:  67.8 peak (W=4)    — 97% of 70
+  Sustained: novel ~45-58 (W=3), copy ~63-68 (W=4).
+- RAM-threading also discovered: benchmarking ANY second thing (even a
+  file cat) during warmup degrades results 4x (mmap pages evicted).
+  Deep-warm requires an idle machine.
+- OPERATIONAL REC: dual-config warm serving — W=3 for novel-heavy,
+  W=4 for copy-heavy; both need ~10 warmup passes before full speed.
