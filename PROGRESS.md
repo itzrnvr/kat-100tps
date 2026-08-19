@@ -169,3 +169,17 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - 5 trials x 3 prompts: median 29.06 (vs 24.71 first run; min 17.22).
 - Novel stack now: pipeline x dspark+ngram W=3 = 2.1x old flagship median.
 - 56.72 peak = best novel decode ever recorded on this system.
+
+## V77 — FLAGSHIP VALIDATED + no-mmap parity (2026-08-19)
+- Definitive harness run (lifecycle-owned, warmup discarded, 3 trials x
+  3 novel + 2 copy): W=3 flagship
+    novel: median 31.73, max 60.30
+    copy:  26.0-47.4
+  Second confirmation run: novel median 31.85, max 62.92.
+- --no-mmap A/B: 31.85 vs 31.73 => PARITY. mmap page-fault tax is not
+  in the warm steady-state path. Thread closed.
+- NEXT: the 3x question. Verify row costs 33ms measured; physics floor
+  (544MB expert reads @ ~55GB/s DDR5) = ~10ms. Where do 23ms/row go?
+  Suspects: thread count underfeeding DDR5 (t8 on 16-thread part),
+  unvectorized dequant-scalar path, per-row expert gather overhead,
+  draft 17ms serialization. Profiling the CPU MoE path next.
