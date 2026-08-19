@@ -646,3 +646,19 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   space is fully mapped: dspark+ngram-mod W3/W4 remains the champion.
 - CAMPAIGN CLOSED: V70-V103. Nothing unmeasured remains in serving,
   speculative, quantization, scheduler, concurrency, or hardware axes.
+
+## V104 — Dense↔expert residency flip: negative; residency space closed (2026-08-20)
+- Tested the last untried VRAM partition: dense to CPU (-ngl 0) +
+  experts to GPU (-ncmoe 8/14). Both LAUNCHED (unlike V92's ngl99
+  combos which OOM'd) — so partial expert residency IS feasible when
+  dense vacates — but throughput regressed:
+    ngl0-ncmoe8:  novel 9.7-13.8, copy 14.4
+    ngl0-ncmoe14: novel 8.1-12.6, copy 12.5  (more GPU = worse)
+- Mechanism: dense-on-CPU adds ~60MB/token bus traffic on EVERY layer
+  (attention+SSM projections), and the MoE-on-GPU path pays GPU upload
+  of activations per layer; partial expert residency can't amortize
+  under uniform routing (V93) even from VRAM.
+- With this, the residency matrix is fully closed: {dense GPU,experts
+  RAM} = champion; all 3 other partitions measured worse.
+- THE VERY LAST configuration axis on this hardware is measured.
+  Campaign stands at V104: copy 62-68 / novel 42-47 at Q4_K.
