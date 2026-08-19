@@ -303,3 +303,28 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   either (a) stock-numerics trunk (their tier), or (b) recalibrate/finetune
   head against our trunk's h (gbuzhf's own 2 finetune attempts made it
   WORSE even on stock trunk — so (b) is known-hard).
+
+## V85 — SETTLED: trunk h divergence is REAL (numpy proof, no engine) (2026-08-19)
+- Built donor-head forward in pure numpy over our banked captures
+  (real token_embd + real post-final-norm h + real lm_head from our GGUF).
+- DECISIVE RESULT (full causal attention, zero engine involvement):
+    trunk-h sanity (h[P] -> tok[P+1]): 46.55%   <- captures + lm_head valid
+    donor head on our h:               0/622 top-1 (0.00%), full context
+  Chance is ~0.0004%. 0/622 with 46.6% sanity = our trunk's h is
+  PROVABLY incompatible with the donor MTP head's expectations.
+- Also falsified along the way (recorded for the method):
+    V84's "dspark works because finetuned on KAT h" — FALSE: shipped
+    kat-dspark-v2-q8.gguf is the un-finetuned Qwen3.6 Koopah head (V70
+    finetune was a wash, never shipped). So: two Qwen3.6-trained heads,
+    one transfers to our trunk (dspark, 0.36-0.82), one doesn't (MTP,
+  0.00). The difference is the FEATURE each consumes:
+    dspark head: consumes 8 EARLY/MID layers (layers 2-38 taps) via its
+    own fc — tolerant to our trunk's re-encode because early-layer
+    activations are less trunk-distinctive
+    MTP head: consumes ONLY post-final-norm h (the most trunk-specific,
+    norm-compressed representation) + fc projects concat(e,h) directly
+- IMPLICATION: donor MTP head can never work on the CQ2-lineage trunk.
+  Options: (a) accept dspark (works, proven), (b) re-graft MTP onto a
+  stock-numerics trunk (their tier lineage — 0.57-0.75 acceptance
+  demonstrated on this engine today), (c) recalibrate head to our h
+  (known-hard; gbuzhf's own 2 attempts degraded acceptance even on stock).
