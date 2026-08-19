@@ -216,3 +216,33 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Campaign totals vs session start: novel 13.9 -> 33.3 med (+140%),
   peaks to 66; copy holds 51.5 peak. At Q4_K quality floor throughout.
 - HOLDING for user instruction per directive (no Fate / new lanes).
+
+## V81 — MTP graft deep-dive: 2 real bugs fixed, still 0% (2026-08-19)
+- Trigger: gbuzhf/KAT-Coder-V2.5-Dev-MTP-GGUF README claims donor-head
+  acceptance 48-76% on KAT. Controlled A/B on identical engine:
+    their build: 0.57-0.75 (sampled AND greedy)
+    our CQ3-MTP: 0.00000 (251 drafts, 0 accepted, every protocol)
+- OUR GRAFT HAD 2 REAL BUGS (both fixed, byte-verified):
+  1. Routed experts (ffn_{gate,up,down}_exps) written expert-FASTEST
+     (transpose(1,2,0) C-order) instead of ggml expert-SLOWEST layout —
+     every expert was a shuffle of all 256. Round-trip-verified decoder
+     showed cos~0.00 vs donor; fixed to expert-major (cos 0.997).
+  2. ALL 2D head matmuls stored transposed (builder applied .T on
+     [out,in] donor which is already ggml-correct flat order).
+  Note: earlier "head verified cos 0.9999" was wrong-vs-wrong (compared
+  transposed donor against transposed graft). Lesson recorded.
+- AFTER fixes (full head rewrite from verified donor, correct
+  orientation, router in-major): acceptance STILL 0.00000.
+- Remaining suspects (checked, not guilty): metadata diff (cosmetic
+  only), vocab/mask token (identical), head wiring (loads clean, same
+  tensor set as their build), q-gate packing (fixed by correct layout).
+- CONCLUSION: the delta is the TRUNK's hidden-state contract. Their
+  trunk = APEX quant of stock KAT. Ours = CQ2 lineage (BF16 re-encode +
+  DeltaNet per-layer head-interleave transforms + re-encoded control
+  plane). The head consumes the trunk's h (via embeddings_nextn) —
+  self-consistent for AR but evidently misaligned for the donor head.
+- NEXT DIAGNOSTIC (queued): logits dump — run target and draft head on
+  the same context, compare top-k. Separates "h extraction path differs"
+  from "h values drifted".
+- dspark comparison verdict UNCHANGED: dspark head (0.36-0.82) remains
+  the only working novel drafter on our trunk.
