@@ -365,3 +365,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Model file state: C:/merge/KAT-CQ3-MTP.gguf now carries the WORKING
   head (17 tensors byte-copied from gbuzhf + our Q4 experts). AR/PPL
   unaffected (head tensors unused by AR path).
+
+## V88 — Pipeline on spec stack: measured both schedulers (2026-08-20)
+- Upstream bug FIXED + committed (93707edfb): degenerate splits (all
+  devices free==0 under pipeline reserve) -> NaN splits -> upper_bound
+  end() -> devices.at() throws 'invalid vector subscript'. Clamped.
+- Full controlled matrix (t12, warm 2x discard, same prompts):
+    gd  pipe OFF spec: novel 26.0/18.6/16.9 copy 28.9
+    gd  pipe ON  spec: novel 11.3/8.7/7.9  copy 10.2  (engaged, no crash)
+    lmd pipe OFF spec: novel 23.7/16.7/14.0 copy 31.7
+    lmd pipe ON  spec: novel 33.3 med/66.1 peak (earlier V76/V77 runs)
+- CONCLUSION: lmdspark's +40% from pipeline does NOT transfer to current
+  upstream — its newer scheduler's split/event/copy machinery runs this
+  workload 2.5x SLOWER with forced pipeline (spec verify = many tiny
+  splits; overlap gain < copy overhead). AR-only was parity.
+- The 33.3 gap decomposition is now fully attributed:
+    ~26 (gd stock) vs 33.3 (lmd pipe) = scheduler-era difference only.
+- ROAD: matching 33+ on gypsy-dragon requires either porting the older
+  scheduler's split handling (deep, risky) or finding upstream-level
+  knobs. Recorded as open item.
