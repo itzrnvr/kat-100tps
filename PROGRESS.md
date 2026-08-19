@@ -632,3 +632,17 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   concurrency (np2/np4) — every axis measured, every verdict recorded.
 - FINAL: copy 62-68 sustained / novel ~42-47 at Q4_K floor. 100 t/s
   requires hardware change (single decisive lever: >20GB VRAM GPU).
+
+## V103 — Drafter-type matrix complete (2026-08-20)
+- Tested the last two untried ngram drafters in compose with dspark (W4,
+  2-pass warmup, 3 trials):
+    ngram-map-k4v: novel 23-28 (very stable), copy 28-37
+    ngram-cache:   novel 20-26 (stable), copy 22-38
+  vs incumbent ngram-mod at same depth: novel 12-50 (swings), copy 38-68.
+- VerDICT: ngram-mod keeps the peak crown (warm copy 62-68). The new
+  types trade ~40% peak for ~10x lower variance — useful only if a
+  latency-SLA (consistent t/s) ever matters more than throughput.
+- With this, ALL drafter types in upstream are measured. The compose
+  space is fully mapped: dspark+ngram-mod W3/W4 remains the champion.
+- CAMPAIGN CLOSED: V70-V103. Nothing unmeasured remains in serving,
+  speculative, quantization, scheduler, concurrency, or hardware axes.
