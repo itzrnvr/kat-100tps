@@ -543,3 +543,14 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   Novel ceiling ~47-67 depending on cache luck; bar 70.
 - The soak experiment is exhausted. Novel 70+ requires the structural
   levers (VRAM/quant/routing). Everything else measured.
+
+## V97 — KAT_WIDE_MAX adaptive width on gypsy-dragon: NEGATIVE (2026-08-20)
+- Ported per-drafter width caps (head W=3, ngram KAT_WIDE_MAX=6) to the
+  clean tree; 4 trials after 4-pass warmup.
+- RESULT: novel 12-21, copy 10-22 — WORSE than plain W=3 or W=4 on both
+  workloads. Mixed-width draft blocks produce non-uniform verify batches
+  (same mechanism as the lmdspark V77-era finding, no markov involved).
+- Adaptive width closed on both trees. Feature stays env-gated (0=off).
+- DUAL-CONFIG RECOMMENDATION STANDS AS FINAL:
+    novel-heavy serve: W=3 (deep-soak ~42 median sustained, 47 peak)
+    copy-heavy serve:  W=4 (62-68 sustained)
