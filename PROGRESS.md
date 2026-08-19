@@ -246,3 +246,20 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   from "h values drifted".
 - dspark comparison verdict UNCHANGED: dspark head (0.36-0.82) remains
   the only working novel drafter on our trunk.
+
+## V82 — correction to V81: router BOTH orientations benched, both 0% (2026-08-19)
+- V81 said "router in-major (donor.T)" — that was my own last-minute
+  re-patch, and it was likely wrong (ggml declares ffn_gate_inp
+  {n_embd, n_expert}; by the {in,out} ne0=in convention the correct
+  flat is donor-as-is). Advisory caught it.
+- Tested now: router donor-as-is AND donor.T, everything else verified
+  correct — 0.00000 acceptance in both. Router orientation is NOT the
+  killer (and donor-as-is is left in place as the convention-correct one).
+- Verdict table (all same engine, same protocol):
+    gbuzhf trunk + donor head: 0.57-0.75
+    our trunk + donor head (any layout): 0.00000
+    our trunk + dspark head:  0.36-0.82
+- Remaining hypothesis: trunk h-contract (CQ2 lineage's re-encoded
+  control plane / DeltaNet transform path changes what h_nextn feeds
+  the head). Next diagnostic = logits dump (head top-k vs target top-k
+  on same context) — queued, not started.
