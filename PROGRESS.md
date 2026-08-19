@@ -123,3 +123,25 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   confidence from the head exists as conf[] — the conf_min gate is the
   greedy-native equivalent and was already tested at parity).
 - Acceptance on novel steady-state: 0.24-0.38, mean-len ~3.0.
+
+## V74 — ROUTING IS UNIFORM: expert-locality family CLOSED (2026-08-19)
+- Instrumented topk logger (KAT_TOPK_LOG env; per-layer selected expert
+  ids per graph) — required fixing a REAL pre-existing bug: the union-v3
+  observer was DEAD CODE inside the graph_compute error branch (missing
+  brace after `return nullptr;`). Union-v3 "parity" measurements were
+  actually union-never-ran. Observer now live (and union results must be
+  re-validated before ever citing them again).
+- MEASURED (novel decode, 227,840 activations):
+    global entropy 15.67 bits (max 16.10)
+    global top-128 experts: 1.0% of activations
+    per-layer top-24 coverage: 0.4% median
+- CONCLUSION: no exploitable hot set. Hot-expert cache, expert
+  replication (2605.11537), union restriction — all structurally
+  inapplicable to KAT. KAT's load-balanced routing sees to that.
+- RAM-read physics now the sole novel bottleneck: per committed token
+  ~544MB expert reads (40L x top-8 x ~1.7MB Q4 expert) at ~55GB/s.
+  Step commits ~3 (mean-len) for width-8 verify -> ~21-28 t/s warm.
+  Theoretical perfectly-overlapped ceiling ~55-60; 100 novel at Q4_K
+  quality needs bytes/token halved beyond what quantization floor allows.
+- Remaining levers: (a) width economics under clean protocol (fewer
+  wasted rows), (b) Fate v2 overlap (bandwidth pipelining, not locality).
