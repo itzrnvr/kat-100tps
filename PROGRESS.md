@@ -450,3 +450,25 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
       --spec-draft-p-min 0.75 --spec-ngram-mod-n-min 8
       --spec-ngram-mod-n-max 24 --spec-ngram-mod-n-match 48
       -ngl 99 -cmoe -fa on -ctk q8_0 -ctv q8_0 -t 12 -c 8192
+
+## V92 — ncmoe partial residency: VRAM-blocked, lane closed (2026-08-20)
+- Tested -ncmoe 4/8/16/24 (partial expert residency in VRAM) on the
+  spec stack: ALL fail CUDA OOM — dense layers (-ngl 99) + KV + draft
+  head + compute buffers already consume the 8GB card; experts don't fit
+  alongside. And even if 4-8 layers fit, that moves only 10-20% of
+  expert traffic off the 24GB/s RAM bus (~+2-3 t/s ceiling) — nowhere
+  near the 3.5x needed for 100.
+- CAMPAIGN TERMINAL PHYSICS (full accounting):
+    per-token expert reads ~544MB / 24GB/s practical bus = the wall.
+    Every lever measured: quant floor (Q4_K, PPL-gated), routing uniform
+    (no hot set), VRAM residency (doesn't fit), pipeline (hurts upstream
+    scheduler), prefetch (bus already saturated), head acceptance
+    (donor ceiling ~0.75-0.8, finetunes degrade it — two teams).
+- FINAL ACHIEVED (all at Q4_K quality, clean upstream tree):
+    novel: 28.2 median / 58.6 peak (5-trial harness)
+    copy:  55.4 peak
+    vs stock AR baseline 12.3: novel 2.3x median / 4.8x peak, copy 4.5x
+- 100 t/s on THIS hardware at Q4_K requires: either expert weights
+  resident in ~400GB/s memory (needs >8GB VRAM or LPDDR-class change),
+  or a quantization breakthrough below Q4_K that passes PPL gates.
+  Both are hardware/format-generation changes, not code.
