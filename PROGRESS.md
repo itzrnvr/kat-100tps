@@ -491,7 +491,7 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   (VRAM capacity for full expert residency) or format-generation
   (sub-Q4_K with PPL pass) changes.
 
-## V94 — Deep-warm regime: near-70 bars, width matrix closed (2026-08-20)
+## V94 — Deep-warm regime (CORRECTED by V95 below — overstated) (2026-08-20)
 - DISCOVERY: page-cache depth is a first-class performance variable.
   After ~10 full-prompt warmup passes, this config enters a deep-warm
   regime with acceptance 0.90-1.00 (mean-len ~4) — far above the
@@ -510,3 +510,20 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   Deep-warm requires an idle machine.
 - OPERATIONAL REC: dual-config warm serving — W=3 for novel-heavy,
   W=4 for copy-heavy; both need ~10 warmup passes before full speed.
+
+## V95 — CORRECTION to V94: novel overstated; honest medians (2026-08-20)
+- V94's "novel sustained 45-58" was the top third of soak samples.
+  Honest statistics across all 18 soak novel samples (W=3):
+    median ~34, best single prompt 63.3 (one occurrence)
+  W=4 novel median ~28. The "67.3 peak" was one confirm-trial prompt
+  that did not reproduce in the soak.
+- HONEST STATUS vs user bar (novel AND copy 70-100):
+    copy: 63-68 warm sustained at W=4 — NEAR BAR (91-97%)
+    novel: ~30 median, ~50-63 rare peaks — FAR FROM BAR (~43%)
+- Novel is the blocker, and its bind is structural: RAM-bound verify
+  under uniform routing (V93's amortization failure). Deep-warm cache
+  helps (24->34 median) but is not a reliable operating point: any
+  concurrent disk activity collapses it 4x (measured V94).
+- Real novel levers are NOT code: (a) VRAM capacity for expert
+  residency, (b) sub-Q4_K quant passing PPL gates, (c) routing
+  correlation. Soak passes do not move the median materially.
