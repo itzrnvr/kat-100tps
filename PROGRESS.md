@@ -280,3 +280,26 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   top-k, same context) to split extraction-path vs value drift.
 - RECAP for the record: dspark head remains the only working novel
   drafter on our trunk (0.36-0.82 acceptance, 25+ t/s novel).
+
+## V84 — MTP 0% root-cause narrowed: engine analysis (2026-08-19)
+- Read the full upstream MTP inference path:
+    trunk graph: h_nextn = RMSNorm(inpL, model.output_norm) — post-norm h
+    staging (speculative.cpp:1482): h shifted right by one (h[P-1] feeds
+    pos P) + pending_h carry across ubatches; verify_h snapshot per row
+    draft head: eh_proj(concat(enorm(tok[P]), hnorm(h))) — matches donor
+    mtp.fc/pre_fc_norm contract
+- HYPOTHESIS KILLED: "our trunk h is permuted/scrambled (DeltaNet
+  transform bug)". CQ2-lineage PPL 5.07 (beats stock 5.15) is impossible
+  with scrambled h. /v1/embeddings probe attempted (400; not needed).
+- SURVIVING EXPLANATION: numerical drift. Our trunk = BF16 re-encoded
+  control plane + custom expert quant + Q8 KV; theirs = near-stock APEX.
+  Donor head trained on exact-BF16 stock h. Speculative verify is
+  exponentially sensitive to logit drift (a 0.5% logit shift flips top-1
+  on near-tie tokens -> 0% acceptance plausible while AR/PPL look fine).
+  Consistent with: dspark head WORKS on our trunk (0.36-0.82) because it
+  was KAT-finetuned against captured KAT h (V70 bank), while donor MTP
+  head was trained on Qwen3.6 stock h.
+- ACTION IMPLICATION: to make donor MTP head work on our trunk we'd need
+  either (a) stock-numerics trunk (their tier), or (b) recalibrate/finetune
+  head against our trunk's h (gbuzhf's own 2 finetune attempts made it
+  WORSE even on stock trunk — so (b) is known-hard).
