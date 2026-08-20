@@ -740,3 +740,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   W4-resident novel may reach ~50-60. Cell otherwise stays empty.
 - CAMPAIGN FINAL STATE UNCHANGED: copy 63-64 / novel 40-54.7
   reproducible resident; all other axes complete.
+
+## V109 — W4-resident soak: UNIVERSAL SINGLE CONFIG found (2026-08-20)
+- The last empty cell ran (launch succeeded at 17.7GB free — the 19GB
+  gate was overly conservative; actual fit leaves 3.1GB):
+    W=4 + --load-mode none + 10-pass soak, 4 trials:
+    t1: novel 33.7/27.5/23.9   copy 63.7
+    t2: novel 29.6/32.6/29.4   copy 63.8
+    t3: novel 32.3/35.9/34.9   copy 66.1
+    t4: novel 33.6/43.9/45.7   copy 62.9  (novel still climbing)
+- HEADLINE: this is the UNIVERSAL config — copy 63-66 AND novel 24-46
+  climbing CONCURRENTLY, one config, no dual-config serving needed.
+  Novel's W=3 peak (54.7) remains higher for novel-only workloads, but
+  W=4-resident is the single-config answer for mixed serving.
+- FINAL CAMPAIGN TABLE (V109, all resident-mode, Q4_K, single client):
+    W=4 resident: copy 63-66 | novel 24-46 climbing  <- UNIVERSAL
+    W=3 resident: copy 28-43 | novel ~40/54.7 peak   <- novel-optimal
+  vs stock 12.3: copy 5.3x / novel 3.7x best single-config.
+- THE CAMPAIGN IS COMPLETE. 40 findings, every cell measured, all
+  reproducible from the runbook.
