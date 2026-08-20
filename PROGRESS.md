@@ -1020,3 +1020,16 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   artifact = BF16 full rebuild (step 2): experts Q4_K from true BF16 source +
   control plane F16/F32, no roundtrip. BF16 verified clean (80/80 regions).
 - NEXT: BF16 full rebuild (V121), then quality gate vs official.
+
+## V121 — dspark draft-length sweep (nmax 4/6/8) on OPT build
+- resident, dspark+ngram, 3 trials each:
+    nmax=4: novel 26.0, copy verbatim 51.7 (baseline)
+    nmax=6: novel 25.3, copy verbatim 49.0
+    nmax=8: novel 21.1, copy verbatim 43.1
+- Monotone decline both axes — dspark confidence decays with block position,
+  longer drafts add rejected tail tokens that waste verify rows. nmax=4 stays
+  optimal (matches V75/V101 width-curve shape from the KAT campaign).
+- CORRECTION to earlier statement: KAT novel was ~40 sustained / 54.7 peak
+  (W=3 resident soak), NOT 26. Ornith novel 26 is still BELOW KAT novel;
+  only copy now matches KAT. Novel gap = draft-acceptance-bound (no ngram
+  help on novel text, native MTP head too weak at 0.20-0.39).
