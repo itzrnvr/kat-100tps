@@ -870,3 +870,28 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   Shrinking requires full rewrite.
 - Also: deleted orn-mtp-head-bf16.bin (1.69GB, re-extractable via
   orn_mtp_extract.py) to fit the compacted output on disk.
+
+
+## V114b — Compactor BPE bug caught before wasted bench
+- First compaction used BPE[14]=0.828125 (212/256) for Q6_K; correct is
+  210/256=0.8203125 — ground-truthed against own logged 220200960/268435456.
+  43 type-14 tensors remain post-requant, so every offset after the first Q6_K
+  would be wrong -> loader adjacency failure again. Caught pre-bench via
+  external review; file regenerated in 36s. LESSON: never trust remembered
+  block sizes; audit constants against measured tensor bytes on disk.
+- Types present in file: only {0: F32, 12: Q4_K, 14: Q6_K}.
+
+## V114 — Ornith all-Q4_K (compacted 20.25GB): faster than official quant
+- Config identical to V112 (dspark+ngram-mod, W4, t12, mmap, 3 trials).
+- trial1 (coldest common point): novel 20.6-22.3 (V112: 17.5-18.6),
+  copy-p1 26.6 (23.4), copy-p2 verbatim 43.5 (33.1).
+- Full spread: novel 20.6-40.2 (med ~23.2), copy 26.6-59.5.
+- Delta vs byte math: +17-31% measured vs ~6% predicted from down_exps byte
+  cut. Two candidate causes: (a) Q4_K dequant cheaper than Q6_K on CPU,
+  (b) WARM-CACHE CONFOUND — compacted file was just written; OS cache may
+  hold a large fraction. V112 ran on a fresh download. NOT yet disentangled;
+  treat V114 numbers as upper bound until a cold re-bench (post-reboot or
+  after cache-evicting load) confirms.
+- Acceptance unchanged (0.75-0.94) — expected: same weights, fewer bytes.
+- NEXT: V115 PPL gate (quality cost of Q6K->Q4K on those 21 layers is
+  UNMEASURED — this is the binding question, not speed).
