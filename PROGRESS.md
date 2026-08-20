@@ -821,3 +821,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Card benchmarks (self-reported, +5-19 delta over Qwen3.6 base) say probable
   quality edge, but NOT a speed candidate on this box. CQ-Ornith build would
   not fix the DeltaNet CPU cost — parking CQ plan unless quality eval demands.
+
+
+## V112b — CORRECTION (user caught it): arch hypothesis withdrawn, real root cause found
+- USER CORRECTION: Qwen3.6 (KAT base) is ALSO hybrid gated-DeltaNet + full-attn.
+  Verified: blk.0 shapes identical across both models (attn_qkv 2048x8192,
+  ssm dims, 30+10 split). "DeltaNet CPU cost" hypothesis is WRONG — withdrawn.
+- REAL finding: official Ornith Q4_K_M has 21/41 ffn_down_exps at Q6_K
+  (0.82 B/elem) vs KAT-CQ3 all-Q4_K experts (0.5625) -> ~+8% avg expert
+  bus traffic/verify row. imatrix-driven quant rule, not arch.
+- Copy-side: acceptance 0.84-0.90 / mean-len 9.5-22.5 vs KAT 0.95 / 21-24
+  -> more verify steps per token. Novel-side acceptance actually HIGHER
+  (0.65-0.85 vs KAT novel ~0.3-0.5) yet slower — residual gap needs
+  split-time instrumentation (KAT_SPLIT_TIME) to close.
+- IMPLICATION: speed gap is partly the OFFICIAL QUANT's choice, not the
+  trunk. CQ-Ornith (all experts Q4_K, control plane F16/F32 from BF16)
+  re-opens as a genuine KAT-speed parity candidate with possible quality
+  edge. CQ-ORNITH-PLAN.md resurrected.
+- Type-map fix for the record: ggml t8=Q8_0, t14=Q6_K (earlier blk.40 dump
+  mislabeled 14 as Q8_0 — sizes unaffected, labels corrected).
