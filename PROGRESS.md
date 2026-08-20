@@ -767,3 +767,23 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   W4-resident is a COPY-FAVORING single-config compromise for mixed
   workloads. No extrapolated novel ceiling. Runbook corrected
   (1a398ba7b).
+
+## V110 — W4-resident 20-pass soak: extrapolation RESOLVED (2026-08-20)
+- Full 20-pass soak + 8 trials (launched at 17.9GB free, 1.6GB after
+  load — tighter than V109's 3.1GB):
+    t1-t2: novel 21-29, copy 60-61
+    t3-t5: novel 27-41, copy 47-55
+    t6:    novel 48.5/47.1/43.6, copy 52.9   <- PEAK
+    t7:    novel 47.8/44.1, copy degrading (5.1)
+    t8:    collapsed 2.7-4.4 (margin exhausted — paging, not config)
+- ANSWER: W4-resident novel does NOT plateau at 30-35; it climbs to
+  ~44-48 sustained with deep soak, matching W3's ~40-42 while also
+  serving copy 53-61. The V109 'compromise' framing was too pessimistic
+  on novel — W4-resident at depth approaches W3's novel performance
+  while retaining most of its copy advantage.
+- CAVEAT: 1.6GB margin is too thin for long sessions (t7-t8 degraded).
+  Practical protocol: launch at >=18.5GB free (or accept ~1h of peak
+  performance before degradation).
+- FINAL PRACTICAL TABLE (resident, Q4_K, single client, deep soak):
+    W4: novel ~44-48 peak / copy 53-61  (single config, needs RAM margin)
+    W3: novel ~40 / copy 28-43          (novel-specialist, safer margin)
