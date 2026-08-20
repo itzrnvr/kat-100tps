@@ -976,3 +976,18 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
 - Serving-impact note: control plane lives in VRAM (-ngl 99 -cmoe), so
   keeping official's Q4/Q6 control plane (vs F16 upgrade) is the
   VRAM-safe choice on 8GB; F16 control plane would risk not fitting.
+
+## V118 — KAT_TOPK_ACCEPT first A/B (user's top-k rescue idea)
+- k=1 vs k=2 on pristine official Ornith REF, dspark+ngram W4 protocol,
+  back-to-back same-session.
+- k=1 trial medians: novel 11.0 (5.6-13.9), copy 13.6 (10.5-34.3) @ 8.6GB free RAM
+- k=2 trial medians: novel 14.75 (11.1-19.9), copy 21.2 (17.4-30.1) @ 19.2GB free RAM
+- PER-LEG ACCEPTANCE LOGS IDENTICAL (0.8716, 0.6591, ... per prompt, both legs):
+  EXPECTED + CONSISTENT — the logged acceptance is the strict-argmax tally;
+  the rescue extends chains past near-ties (draft in target top-2 but not
+  argmax) instead of inflating that metric.
+- CONFOUND: RAM 8.6 vs 19.2GB across legs — tps delta (34% novel / 56% copy
+  median) is real-direction but magnitude unconfirmed. Equal-RAM re-run
+  pending (post-BF16, box-settled).
+- Mechanism plumbing verified: KAT_TOPK_ACCEPT env in gypsy-dragon DLL,
+  committed; sampling.cpp accept-loop rescues via cur_p rank walk.
