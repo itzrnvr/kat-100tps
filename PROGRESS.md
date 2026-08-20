@@ -802,3 +802,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   ledger means every draft token is verified by the real model — no
   unverified content, no quality loss. It does NOT mean byte-identical
   output streams. Both properties are documented here.
+
+
+## V112 — Ornith-1.5-35B-A3B first bench: quality candidate, throughput downgrade
+- Source: official ornith-ai Q4_K_M (21.71GB), downloaded via pardl2 (22.6MB/s).
+  SURPRISE: official GGUF ships complete native MTP head (blk.40.*, 20 tensors,
+  imatrix-quantized, nextn_predict_layers=1) — no graft needed. mudler APEX
+  BF16 head (1.69GB) range-extracted as CQ reference material only.
+- Arch: hybrid DeltaNet — 30 linear-attn layers (attn_qkv/ssm_*) + 10 full-attn
+  (every 4th from blk.11), 256 experts top-8, 41 blocks incl MTP layer.
+- dspark head transfers cleanly: acceptance 0.65-0.93, mean-len 2.6-22.5
+  (ngram spine fires on copy exactly like KAT).
+- t/s (identical protocol, mmap, W4, t12, dspark+ngram-mod, 3 trials):
+  novel med 18.5 (16.1-26.9) | copy med 33-35 (22.5-36.6)
+- vs KAT same-protocol mmap: novel 23-28, copy 52-57 -> Ornith = 0.6-0.8x.
+- Root cause hypothesis: DeltaNet recurrent-state math on CPU (30/41 layers)
+  is far heavier than KAT's full-attention trunk; +21.7 vs 19.9GB traffic.
+- Card benchmarks (self-reported, +5-19 delta over Qwen3.6 base) say probable
+  quality edge, but NOT a speed candidate on this box. CQ-Ornith build would
+  not fix the DeltaNet CPU cost — parking CQ plan unless quality eval demands.
