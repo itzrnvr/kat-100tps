@@ -17,3 +17,12 @@ KEY FACTS:
 - official Ornith-1.5 Q4_K_M ships the complete MTP head (blk.40.*, 41 blocks)
 - ggml type ids: 8=Q8_0, 12=Q4_K, 14=Q6_K, 15=Q4_0 (t8 is NOT Q6_K)
 - draft-mtp on Ornith: acceptance 0.196-0.36, hangs server -> dspark champion
+
+## Tooling addendum (V114-V115 session)
+- orn_compact.py — GGUF full-rewrite compactor; BPE map ground-truthed for
+  types {0,12,14}; lesson: audit constants against measured tensor bytes.
+- orn_v115_orchestrator.py — strictly-serial V115 pipeline (waits on KAT PPL,
+  delete broken, re-download official via pardl2 with pstate-based completion
+  check, official PPL, CQ PPL, verdict). Idempotent per stage; relaunch-safe.
+- V115-TEMPLATE.md — pre-registered gates (PASS <=+0.05 / MARGINAL <=+0.30 /
+  FAIL >+0.30 on official-vs-CQ same-model delta).
