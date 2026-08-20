@@ -1097,3 +1097,16 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   clean re-run (needs ~17.5GB free + quiet box).
 - NEXT: clean re-run when RAM allows; if confirmed, RedHat replaces kat-dspark
   as champion draft for Ornith.
+## V123b — RedHat dspark re-bench (chrome killed, 2.3GB floor, still residual pressure)
+- t/s (3 trials): novel mean 24.2 (peak 45.23), copy mean 33.9 (peak 60.25)
+  vs kat-dspark champion clean: novel 26.0 / copy 51.7 (peak 59.6).
+  NOTE: run still had 2.3GB pagefile pressure (needs ~17.5GB free), so means
+  are FLOORS; peaks show upside (novel 45.2 > any Ornith+kat observation,
+  copy 60.25 > 59.6 champion peak).
+- Acceptance (valid, RAM-independent, same prompts):
+  - novel mean len 6.82 (4.47/6.32/11.69/5.40/6.23) vs kat 4.60 -> RedHat
+    drafts 1.5x longer on fresh text (correction from earlier 2x estimate)
+  - copy identical (22.50/0.89583, ngram-dominated)
+- VERDICT: RedHat dspark at least competitive on novel, likely better
+  (draft-length advantage + higher peaks); copy depressed only by RAM.
+  Clean run still needed to crown it (Docker+ChatGPT+1 bun ~3GB more).
