@@ -787,3 +787,18 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - FINAL PRACTICAL TABLE (resident, Q4_K, single client, deep soak):
     W4: novel ~44-48 peak / copy 53-61  (single config, needs RAM margin)
     W3: novel ~40 / copy 28-43          (novel-specialist, safer margin)
+
+## V111 — Bit-exactness disposition (documented decision, 2026-08-20)
+- User asked whether speculative output is byte-identical to plain AR.
+  Answer: NO — not bit-exact, but quality-identical. Root cause: DFlash
+  KV-injection computes the same sums in a different op order, and float
+  addition is non-associative (7th-decimal-place wobble on near-ties).
+- Could we make it identical? Technically yes (deterministic reduction
+  orders, serialized GPU reductions, mirrored code paths) but DECLINED:
+  costs speed (the thing we optimized all campaign), permanent
+  maintenance tax, and zero perceivable benefit. Same position as
+  llama.cpp upstream re batch-1 vs batch-N.
+- CLARIFICATION for future readers: "speculation is lossless" in this
+  ledger means every draft token is verified by the real model — no
+  unverified content, no quality loss. It does NOT mean byte-identical
+  output streams. Both properties are documented here.
