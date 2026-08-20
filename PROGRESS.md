@@ -1110,3 +1110,28 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
 - VERDICT: RedHat dspark at least competitive on novel, likely better
   (draft-length advantage + higher peaks); copy depressed only by RAM.
   Clean run still needed to crown it (Docker+ChatGPT+1 bun ~3GB more).
+## V123c — mmap experiment + per-request pairing: RedHat pathology found
+- --load-mode mmap does NOT reduce memory on this fork: -cmoe forces tensor
+  overrides to CPU (loader warning: "consider using --load-mode none for
+  better performance"). Page footprint stayed ~18GB, avail 0.6-2.3GB both
+  runs, but sin/sout=0 (mapped pages evictable — system safe, no swap I/O).
+  mmap = strict downgrade for cmoe; resident remains the intended path.
+- Head-vs-head under identical mmap config (c2048, same 16-request script):
+  - t/s: R novel 19.8 / copy 26.0 vs K novel 23.6 / copy 35.5
+  - acceptance per position (same prompts, deterministic): R longer at 7/9
+    novel positions, up to 3.3x (ml 6.94 vs 2.56, 10.00 vs 3.07, 11.69 vs
+    3.69, 20.82 vs 8.39); copy1 identical (22.50 both)
+  - PATHOLOGY: R requests 2-3 (trial-1 novel 2/3) had 0/14 and 0/18 draft
+    tokens (draft dead mid-request, ran at AR speed 13.9-15.1 t/s); K never
+    dies. Draft-cache-reset bug interacting with R config (5 extract layers,
+    draft-vocab) — needs profiling/fork fix.
+- Per-round cost: R ~400ms vs K ~150ms per draft round (2.7x) even on
+  positions with equal acceptance — unexplained without profiling; not
+  explained by set_rows (I64 is CUDA-supported), head bandwidth (~370MB vs
+  ~520MB/round — R should be cheaper), or embed gather.
+- Resident runs (run 2, starved): R novel 24.2 mean / 45.2 peak, copy 33.9 /
+  60.25 peak vs K clean 26.0 / 51.7 (59.6 peak). R peaks are the highest
+  observed on Ornith. R >= K on draft quality (3x reproduced); t/s verdict
+  BLOCKED on the per-round cost + draft-death bug.
+- NEXT: (a) quiet-box resident A/B, or (b) profile the R draft forward
+  (CPU vs GPU placement check) and fix draft-cache reset.
