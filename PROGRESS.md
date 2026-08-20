@@ -1135,3 +1135,26 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   BLOCKED on the per-round cost + draft-death bug.
 - NEXT: (a) quiet-box resident A/B, or (b) profile the R draft forward
   (CPU vs GPU placement check) and fix draft-cache reset.
+## V124 — RedHat dspark root-cause: head drafts JUNK on Ornith trunk; compose acceptance was all ngram
+- Decisive experiments (all same 16-request bench, deterministic acceptance stats):
+  1. d2t->CUDA placement fix (llama-arch.cpp D2T op GET_ROWS->SET_ROWS probe +
+     SET_ROWS case in loader): built, verified d2t now on CUDA0 — NO effect
+     (acceptance byte-identical). Fix kept (correct) but not the bottleneck.
+  2. target_layers invariance: patched GGUF to [3,11,21,31,38] and [1,2,3,4,5] —
+     acceptance BYTE-IDENTICAL across all three configs. Drafts do not depend
+     on the extracted target features AT ALL.
+  3. p_min=0 (gate off): acceptance COLLAPSES (novel 0.001-0.30) — the conf
+     gate was masking junk; drafts beyond position 0 are garbage.
+  4. n-max=8 (trained width): no change (drafts byte-identical to W4).
+  5. **dspark-only (no ngram): 0.00 acceptance on ALL 11 requests** — even copy
+     prompts. ALL compose acceptance was ngram-mod; the head contributes junk.
+- First-sight-dies/second-sight-works pattern reinterpreted: that's the NGRAM
+  table (empty on novel first-sight, full on repeats), not the draft cache.
+- Per-request pairing: RedHat ~133 decode rounds/request vs kat ~67, drafting
+  1.3 tok/round (gate truncation) vs kat 2.3 — why RedHat compose loses t/s.
+- NEXT DECISIVE: kat-dspark dspark-only control (running). If kat-only shows
+  real acceptance (V119 matrix said 0.3-0.5) -> RedHat head is trunk-
+  incompatible (trained vs dense Qwen3.6 verifier; Ornith recurrent-layer
+  features saturate its fc). If kat-only ALSO collapses -> dspark feature path
+  is broken on this build for ALL heads, and all dspark compose wins were
+  ngram+markov-bigram.
