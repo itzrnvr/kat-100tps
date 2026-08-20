@@ -1005,3 +1005,18 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   Cause: (a) 21/41 ffn_down_exps at Q6_K raise per-verify-row cost (+8-9%
   bytes), (b) V114's Q4_K requant (+25%/+52%) not applied per user pivot.
 - MTP on this model confirmed useless; dspark the only paying drafter, copy-only.
+
+## V120 — Expert-bytes tax CONFIRMED as the bottleneck (OPT build)
+- Built OPT: official copy + 21 Q6_K ffn_down_exps -> Q4_K (requant from Q6_K),
+  compacted to 20.26GB contiguous (in-place shrink alone breaks GGUF contiguity,
+  V114a lesson re-confirmed: load fails until compacted).
+- dspark+ngram resident bench (official file stays pristine):
+    novel 26.0 (was 19.4, +34%)
+    copy verbatim 51.7 med / 59.6 peak (was 33-48 peak) -> KAT-LEVEL (52-57)
+    copy reproduce+continue 29.8
+- VERDICT: Q6_K expert-bytes tax was THE copy-speed bottleneck. Fixing it
+  lifts verbatim copy to KAT resident levels. Novel also +34%.
+- CAVEAT: OPT double-quantized those 21 tensors (Q6_K->Q4_K). The clean final
+  artifact = BF16 full rebuild (step 2): experts Q4_K from true BF16 source +
+  control plane F16/F32, no roundtrip. BF16 verified clean (80/80 regions).
+- NEXT: BF16 full rebuild (V121), then quality gate vs official.
