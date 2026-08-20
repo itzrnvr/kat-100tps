@@ -856,3 +856,17 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   ran 15+ tasks clean. Not chasing further — dspark is champion either way.
 - VERDICT: dspark head remains the draft model for Ornith exactly as for KAT.
   Ornith matrix complete: official-quant trunk + dspark+ngram-mod = the config.
+
+
+## V114a — FAILED approach + real lesson: GGUF strict offset adjacency
+- In-place tensor shrink (Q6_K->Q4_K at same offset) is INVALID: llama.cpp
+  gguf_init_from_reader enforces tensor N start == tensor N-1 end. First
+  loader error: blk.0.ffn_down_shexp offset 941940736 != expected 872734720.
+- Data + type fields were all correct; only layout broke. Fix: orn_compact.py
+  — full-file rewrite with recomputed sequential offsets (also reclaims
+  1.45GB of dead holes). Output: Ornith15-Q4K-CQ.gguf.
+- RULE for future GGUF surgery: in-place TYPE patches only valid when the
+  new blob >= old blob size (fill slack with padding) OR sizes equal.
+  Shrinking requires full rewrite.
+- Also: deleted orn-mtp-head-bf16.bin (1.69GB, re-extractable via
+  orn_mtp_extract.py) to fit the compacted output on disk.
