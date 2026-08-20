@@ -1043,3 +1043,16 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
 - Width lever CLOSED. Novel gap (26 vs KAT ~40) is draft-acceptance-bound,
   not width-bound. Remaining novel levers: better draft model (none available
   for this trunk) or hardware.
+
+## V122 — JetSpec (causal, Qwen3.6-native) converted + benched: loses to dspark
+- Converted JetSpec/jetspec-Qwen3.6-35B-A3B (8-layer causal) via build_jetspec.py
+  -> jetspec-q36-draft.gguf (400MB, Q6_K, superweight audit 12k outliers).
+- Bench on Ornith OPT (resident, draft-dflash+ngram):
+    jetspec novel 17.7 / copy verbatim 45.8
+    vs kat-dspark novel 26.0 / copy verbatim 51.7  <- dspark WINS both
+- Causal head acceptance 0.52 / meanlen 8.8 vs dspark 0.65-0.93 / meanlen ~3.
+  VERDICT: Markov+confidence heads (dspark) matter MORE than the
+  native-vs-cross-model distinction. Plain causal loses.
+- IMPLICATION: RedHat dspark (Qwen3.6-native WITH markov+conf) is the real
+  prize — best of both. Its conversion needs draft-vocab support (d2t/t2d,
+  embed_tokens, lm_head-32000, 16/2/256 heads) — next (V123).
