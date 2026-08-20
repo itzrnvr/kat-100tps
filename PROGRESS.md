@@ -991,3 +991,17 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   pending (post-BF16, box-settled).
 - Mechanism plumbing verified: KAT_TOPK_ACCEPT env in gypsy-dragon DLL,
   committed; sampling.cpp accept-loop rescues via cur_p rank walk.
+
+## V119 — Ornith drafter matrix + AR floor (resident, official REF)
+- no-spec AR floor: novel 18.3, copy 18.9 t/s (FASTEST AR measured on this
+  box; KAT AR baseline was 12.3 — Ornith's gated-DeltaNet hybrid decodes
+  faster per-token than KAT despite +8-9% expert bytes).
+- MTP (native head): novel 9.8 / copy 11.1 = 0.55x AR — ACTIVELY HARMFUL,
+  acceptance 0.20-0.39 makes every draft rejected, verify overhead dominates.
+- dspark: novel 19.4 / copy 33.0 (peak 48.9) = 1.0x novel, 1.75x copy.
+- ngram-mod: novel 17.2 / copy 18.5 (~0.95x, no benefit).
+- WHY SLOWER THAN KAT: NOT the base level (Ornith AR > KAT AR). It's the
+  speculation multiplier — KAT got ~5x AR (copy 63-66), Ornith gets ~1.75x.
+  Cause: (a) 21/41 ffn_down_exps at Q6_K raise per-verify-row cost (+8-9%
+  bytes), (b) V114's Q4_K requant (+25%/+52%) not applied per user pivot.
+- MTP on this model confirmed useless; dspark the only paying drafter, copy-only.
