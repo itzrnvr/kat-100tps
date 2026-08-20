@@ -759,3 +759,11 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   vs stock 12.3: copy 5.3x / novel 3.7x best single-config.
 - THE CAMPAIGN IS COMPLETE. 40 findings, every cell measured, all
   reproducible from the runbook.
+
+### V109 correction (same day): framing fix
+- Original entry called W4-resident "UNIVERSAL" with novel "climbing
+  24->46" — cherry-picked extremes. Honest: novel median ~30-35
+  (prompt range 24-46), W=3-resident remains novel-optimal (~40/54.7).
+  W4-resident is a COPY-FAVORING single-config compromise for mixed
+  workloads. No extrapolated novel ceiling. Runbook corrected
+  (1a398ba7b).
