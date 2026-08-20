@@ -728,3 +728,15 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - FINAL CAMPAIGN LEDGER (V70-V108, 39 findings):
   Reproducible: copy 63-64 / novel ~40-55 at Q4_K, single client.
   All axes measured. Both repos pushed. Machine clean.
+
+## V109-status — W4-resident novel soak: BLOCKED on ambient RAM (2026-08-20)
+- Attempted 3x after user's evals finished; each exited INSUFFICIENT.
+- Need ~19GB free (17GB expert residency + OS headroom); machine
+  plateaus at 17.4-17.7GB with ChatGPT+Docker+bun running.
+- NOT RETRYING further automatically. TO RUN (5-min task): close
+  ChatGPT/Docker/one bun window (~1.5GB), then
+    cd D:/merge/train && python res_novel4.py
+  Expectation from V107 trend (25.9->33.8 at one warm pass): soaked
+  W4-resident novel may reach ~50-60. Cell otherwise stays empty.
+- CAMPAIGN FINAL STATE UNCHANGED: copy 63-64 / novel 40-54.7
+  reproducible resident; all other axes complete.
