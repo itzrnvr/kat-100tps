@@ -53,6 +53,9 @@ def worker():
                         raise IOError(f"short read {len(data)}")
                     fh.seek(s)
                     fh.write(data)
+                    fh.flush()
+                    os.fsync(fh.fileno())  # V115a: sidecar must never claim
+                    # a chunk whose bytes are not physically on disk
                     with lock:
                         bytes_done += len(data)
                         persist()

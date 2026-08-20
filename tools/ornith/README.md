@@ -26,3 +26,11 @@ KEY FACTS:
   check, official PPL, CQ PPL, verdict). Idempotent per stage; relaunch-safe.
 - V115-TEMPLATE.md — pre-registered gates (PASS <=+0.05 / MARGINAL <=+0.30 /
   FAIL >+0.30 on official-vs-CQ same-model delta).
+
+## Session tooling addendum 2 (V115a-V116)
+- pardl2.py — now fsync-durable (sidecar never claims unwritten bytes).
+- orn_ref_integrity.py — random-region byte-verify vs HF source; the ONLY
+  trustworthy post-download gate (size lies; preallocation).
+- orn_v115_gated.py — machine-respect V115 chain: hard gate on zero
+  llama-server + >=20GB RAM, sanity-gated PPL legs, verdict auto-print.
+- sweep.py — find/kill stray pardl2/llama processes by command line.
