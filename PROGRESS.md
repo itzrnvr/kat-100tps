@@ -1056,3 +1056,18 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
 - IMPLICATION: RedHat dspark (Qwen3.6-native WITH markov+conf) is the real
   prize — best of both. Its conversion needs draft-vocab support (d2t/t2d,
   embed_tokens, lm_head-32000, 16/2/256 heads) — next (V123).
+
+## V122b — CORRECTION: kat-dspark-v2 is ALREADY Qwen3.6-35B-A3B native
+- kat-dspark-v2 GGUF metadata: base_model = Qwen3.6-35B-A3B NVFP4 (Unsloth).
+  It is NOT cross-model / NOT KAT-trained — that premise (V112-V122) was
+  wrong. It is native to the same qwen3.6 family as Ornith-1.5.
+- Reframe: JetSpec (native, causal, no markov) LOST to dspark -> the win is
+  the Markov+confidence heads, not nativity. Our head already has both +
+  is native.
+- CONCLUSION: speculator heads are NOT the novel bottleneck. Ornith novel
+  gap (26 vs KAT ~40) is a TRUNK property (fresh-text draftability), not a
+  fixable head swap. RedHat dspark (native+markov but leaner 5-block/
+  draft-vocab) would not obviously beat ours + needs unverified fork
+  draft-vocab support — parked.
+- FINAL Ornith state on this box: copy verbatim 51.7 / novel 26.0 (OPT
+  build + kat-dspark + ngram, resident, W4). At hardware/acceptance ceiling.
