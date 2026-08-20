@@ -923,3 +923,17 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Measurement order: KAT PPL (running) -> redownload official -> official
   PPL -> CQ PPL -> verdict. ~2h total, machine dedicated (no disk
   contention during runs).
+
+## V115a — two measurement-integrity failures caught and fixed
+1. Garbage-PPL leg: official-REF PPL produced ~1.8M PPL/chunk because the
+   file was 34% zeros — I fired the leg after checking FILE SIZE stability,
+   but pardl2 preallocates full size at start. My own orchestrator comment
+   said 'Never trust size alone' — and my manual check did exactly that.
+   RULE (now enforced): a pardl2 target is complete ONLY when the
+   .pstate.json sidecar is absent AND no pardl2 process is running.
+2. Earlier: wedge + parser. Old orchestrator (pre-fix code in memory) held
+   a file lock after its clamp expiry; relaunch hit WinError 32. The PPL
+   parser expected 'perplexity =' but this build prints 'PPL ='.
+3. Direct-exe bash launch eats backslashes: '-f D:\merge\...' arrived as
+   'D:mergeE0...' — use forward slashes for all direct exe calls.
+Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
