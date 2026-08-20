@@ -895,3 +895,18 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 - Acceptance unchanged (0.75-0.94) — expected: same weights, fewer bytes.
 - NEXT: V115 PPL gate (quality cost of Q6K->Q4K on those 21 layers is
   UNMEASURED — this is the binding question, not speed).
+
+## V114c — full statistical analysis of the A/B
+- Medians: novel 18.5->23.2 (+25%), copy-extend 23.4->27.5 (+17%),
+  verbatim 35.1->53.5 (+52%).
+- Same-trial deltas all positive except one outlier (-0.7). Trial1-to-trial1
+  (coldest common point): +17-31% — BEYOND the ~6% byte cut.
+- Mechanism hypothesis: Q4_K dequant cheaper than Q6_K on CPU (no ql/qh
+  reassembly, simpler scale unpack). On CPU-bound expert reads this compute
+  is on the critical path, so it multiplies with the byte reduction.
+- Warm-cache confound still possible for the larger trial2/3 deltas; the
+  cold-point comparison is the conservative one and still shows +17-31%.
+- IMPLICATION FOR CQ MAP: if V115 PPL passes, all-Q4_K experts + our F32/F16
+  control plane is BOTH faster and smaller than the official imatrix mix.
+  The official quant's Q6_K down_exps choice costs ~20% speed for quality
+  on 21/41 layers we may not need.
