@@ -958,3 +958,21 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
 - Read: model difference (different training), NOT quant artifact. Makes
   the official-vs-CQ delta the sole open question, as designed.
 - Full legs pending on the machine-free gate (bg_9 chain).
+
+## V117 (in progress) — the proper build: BF16-direct quant, no roundtrip
+- USER-DRIVEN redesign (right call): V114's 21 Q6_K->Q4_K tensors were
+  DOUBLE-quantized (deq Q6 -> quant Q4), stacking error on exactly the
+  tensors the imatrix flagged as sensitive. Fix: pull those 21 down_projs
+  from BF16 safetensors (packed [256,2048,512] per layer, HTTP range) and
+  quantize DIRECT to Q4_K. Everything else byte-copied from REF (imatrix
+  Q4_K experts + official control plane + MTP head preserved).
+- Layout empirically verified BEFORE build (orn_layout_check.py):
+  cos(direct)=0.99746 vs cos(transposed)=0.00027 on L5 expert 0 —
+  torch->GGUF expert bytes need NO transpose (matches build_cq3 finding).
+- safetensors index: 1811 tensors, experts packed per-layer as
+  mlp.experts.{down_proj, gate_up_proj}, BF16, 16 shards.
+- Builder: orn_build_dq.py (compact rewrite, ground-truthed BPE map).
+  Output: Ornith15-Q4K-DQ.gguf (~20.25GB expected, same as V114 file).
+- Serving-impact note: control plane lives in VRAM (-ngl 99 -cmoe), so
+  keeping official's Q4/Q6 control plane (vs F16 upgrade) is the
+  VRAM-safe choice on 8GB; F16 control plane would risk not fitting.
