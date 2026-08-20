@@ -950,3 +950,11 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
 - Also this session: RAM-starvation incident — PPL leg launched while user's
   llama-server held RAM; killed on complaint (18.5GB free after). V115 chain
   now hard-gated on zero llama-server + >=20GB RAM (orn_v115_gated.py).
+
+## V115b — preliminary: partial official leg (8 chunks, verified REF file)
+- Killed leg's data is still valid for the chunks it completed.
+- Per-chunk: Ornith-official consistently ~+1.0 above KAT (2.41/1.44 ...
+  4.19/2.69), parallel tracking, gap widening on later chunks.
+- Read: model difference (different training), NOT quant artifact. Makes
+  the official-vs-CQ delta the sole open question, as designed.
+- Full legs pending on the machine-free gate (bg_9 chain).
