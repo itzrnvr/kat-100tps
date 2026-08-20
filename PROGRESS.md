@@ -1033,3 +1033,13 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   (W=3 resident soak), NOT 26. Ornith novel 26 is still BELOW KAT novel;
   only copy now matches KAT. Novel gap = draft-acceptance-bound (no ngram
   help on novel text, native MTP head too weak at 0.20-0.39).
+
+## V121b — width curve complete on Ornith OPT (nmax 3/4/6/8)
+- nmax=3: novel 19.5, copy verbatim 31.7
+- nmax=4: novel 26.0, copy verbatim 51.7  <- UNIVERSAL OPTIMUM
+- nmax=6: novel 25.3, copy verbatim 49.0
+- nmax=8: novel 21.1, copy verbatim 43.1
+- Ornith does NOT follow KAT's W=3-novel-optimal pattern; W=4 peaks both axes.
+- Width lever CLOSED. Novel gap (26 vs KAT ~40) is draft-acceptance-bound,
+  not width-bound. Remaining novel levers: better draft model (none available
+  for this trunk) or hardware.
