@@ -937,3 +937,16 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
 3. Direct-exe bash launch eats backslashes: '-f D:\merge\...' arrived as
    'D:mergeE0...' — use forward slashes for all direct exe calls.
 Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
+
+## V116 — disk cleanup (user directive)
+- Deleted (probe-verified not in-use via exclusive-open first):
+  KAT-CQ2-MTP, KAT-CQ3-MTP (21.3GB, the campaign champion trunk — re-buildable
+  from ledger; PPL anchor 6.9831 recorded), kat-mtp-head safetensors, fctrace,
+  jetspec head; Ornith-1.0 9B Q4_K_M, its MTP head, 18.8GB BF16 shards,
+  engine/research/model dirs + worktrees.
+- KEPT: kat-dspark-v2-q8.gguf (draft head for Ornith-1.5 serving too),
+  Ornith15-Q4KM-REF.gguf + Ornith15-Q4K-CQ.gguf (V115 gate inputs).
+- Freed: C: 29->49.5GB, D: 21.7->42.6GB.
+- Also this session: RAM-starvation incident — PPL leg launched while user's
+  llama-server held RAM; killed on complaint (18.5GB free after). V115 chain
+  now hard-gated on zero llama-server + >=20GB RAM (orn_v115_gated.py).
