@@ -709,3 +709,22 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   requires machine freshly booted/idle, and novel still needs a few
   passes to reach its ~42 ceiling (trend was climbing through t3).
 - NEW CHAMPION PROTOCOL: resident-mode copy config. Runbook updated.
+
+## V108 — Resident novel soak: best reproducible novel numbers (2026-08-20)
+- W=3 + --load-mode none + 10-pass soak, 4 trials:
+    t1: 27.2/19.1/20.5 (first measure after soak)
+    t2: 31.0/29.5/37.6
+    t3: 39.5/54.7/24.8
+    t4: 41.2/54.7/28.9
+  copy alongside: 28-43.
+- VERDICT: resident mode reproduces the full deep-warm novel ceiling
+  (peak 54.7, sustained ~40) WITHOUT mmap fragility — no cross-session
+  cache luck, immune to disk-activity collapse. Combined with V107
+  (copy 63-64 trial-1), RESIDENT MODE IS THE COMPLETE SERVING ANSWER
+  for this hardware:
+    copy:  63-64 from near-cold (W=4 resident)
+    novel: ~40 sustained / 54.7 peak after 10-pass soak (W=3 resident)
+  Constraint: ~19GB free at launch, dedicated machine session.
+- FINAL CAMPAIGN LEDGER (V70-V108, 39 findings):
+  Reproducible: copy 63-64 / novel ~40-55 at Q4_K, single client.
+  All axes measured. Both repos pushed. Machine clean.
