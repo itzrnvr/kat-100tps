@@ -840,3 +840,19 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   edge. CQ-ORNITH-PLAN.md resurrected.
 - Type-map fix for the record: ggml t8=Q8_0, t14=Q6_K (earlier blk.40 dump
   mislabeled 14 as Q8_0 — sizes unaffected, labels corrected).
+
+
+## V113 — draft-mtp (native head) on Ornith trunk: loses to dspark, then hangs
+- Config: official Q4_K_M (blk.40 nextn head built-in), --spec-type draft-mtp,
+  no external draft model, else identical protocol.
+- Results before hang: warmup acc 0.196 / tg 10.5; novel p1 acc 0.196 meanlen
+  1.58 / 13.9 t/s; novel p2 acc 0.364 meanlen 2.08 / 15.5 t/s.
+- vs dspark same prompts: acc 0.65-0.85 / novel med 18.5, copy 33-35.
+  draft-mtp is decisively worse on BOTH acceptance and rate — same verdict as
+  KAT MTP saga: draft-side MoE reads RAM experts, slow + weak novel drafting.
+- STABILITY FINDING: server HUNG mid task 453 (3rd novel prompt) — log frozen,
+  process alive but wedged, socket reset, Stop-Process failed (needed taskkill
+  /F by PID 44340). draft-mtp path has a hang mode on this build; dspark path
+  ran 15+ tasks clean. Not chasing further — dspark is champion either way.
+- VERDICT: dspark head remains the draft model for Ornith exactly as for KAT.
+  Ornith matrix complete: official-quant trunk + dspark+ngram-mod = the config.
