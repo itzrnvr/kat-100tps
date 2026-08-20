@@ -1158,3 +1158,32 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   features saturate its fc). If kat-only ALSO collapses -> dspark feature path
   is broken on this build for ALL heads, and all dspark compose wins were
   ngram+markov-bigram.
+## V125 — RedHat head: full diagnosis tree + reference semantics verified
+- ROOT-CAUSE SEARCH COMPLETE (all fork-side discriminators exhausted):
+  * d2t bijection: VERIFIED correct (relative->absolute converter math checks
+    out: {k+d2t[k]} = 32000 distinct, in-range; t2d all-false dead placeholder)
+  * rope: head runs FULL-width 256-dim rope from its own config (reference
+    model_definitions.py builds rotary from head config, no partial factor);
+    kat works through identical path -> rope NOT the cause. Added dormant
+    dflash rope-sections plumbing anyway (dflash.cpp: optional
+    dflash.rope.dimension_sections -> ggml_rope_multi/IMROPE; SpecForge
+    exports unaffected — no sections key, plain rope path).
+  * markov chain semantics: reference MarkovHead (w1 embedding over verifier
+    vocab, w2 to draft vocab, vanilla = plain W2@W1[prev]) is EQUIVALENT to
+    the fork's argmax chain including the d2t scatter. Not the cause.
+  * SWA off: 0% still. p_min 0: collapse. W8: no change. Layer sets: invariant.
+- FINAL STATE: kat-dspark healthy solo (0.83-0.96 acc, ml 2.4-4.7, 22.2 t/s
+  novel alone); RedHat head deterministically drafts junk on Ornith trunk
+  (0% solo, every config).
+- REMAINING SUSPECTS (need torch reference-diff harness to separate):
+  1. noise-block attention layout (fork build_attn non-causal + DSA KV
+     injection vs reference [k_ctx;k_noise] concat — position/id mapping of
+     injected K/V rows)
+  2. subtle markov/conf wiring at fp level
+  3. fc feature precision (F32 vs BF16 trained)
+- NEXT (engine work, fresh-context sized): harness that runs ONE fixed prompt
+  through both llama-server (-lv 5, capture draft candidates) and speculators
+  CPU reference (same weights via HF safetensors), diff top-k per position.
+  Divergence at pos 0 = fork graph bug (bisect intermediates); match at pos 0
+  + divergence later = chain-conditioning mismatch.
+- Champion unchanged: kat-dspark-v2 + ngram-mod compose.
