@@ -1071,3 +1071,29 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   draft-vocab support — parked.
 - FINAL Ornith state on this box: copy verbatim 51.7 / novel 26.0 (OPT
   build + kat-dspark + ngram, resident, W4). At hardware/acceptance ceiling.
+## V123 — RedHat dspark (draft-vocab) converted + benched on Ornith OPT
+- Converted RedHatAI/Qwen3.6-35B-A3B-speculator.dspark via the FORK'S OWN
+  convert_hf_to_gguf.py (DSparkModel class, Qwen3DSparkModel arch) — NO custom
+  code. Output: D:/merge/out/redhat-dspark-q8.gguf (1.01GB, 65 tensors, Q8_0).
+- Fork's dflash loader + graph FULLY support draft-vocab: d2t (I64, scatter
+  both in lm_head path and markov head), tok_embd [2048,248320] own embed,
+  output [2048,32000] draft-vocab lm_head, markov_w1 full-vocab +
+  markov_w2 draft-vocab, conf_proj {2304,1}, sample_from_anchor, SWA 2048
+  pattern, block_size 8, target layers [2,10,20,30,37], mask 248077.
+  Verified line-by-line in src/models/dflash.cpp (asserts I64 d2t, set_rows
+  scatter at lines 295-303 & 535-548).
+- BENCH (resident, dspark+ngram W4, same champion config): RAN UN-GATED at
+  user request — RAM collapsed to 0.6GB available (pagefile thrash), so
+  t/s are INVALID (floor values only): novel ~19.8 mean / copy ~21.2 mean,
+  peaks 36.8 / 39.7 at low-pressure moments. Server survived, no freeze.
+- VALID signal (acceptance is sampler-level, RAM-independent), same 5
+  prompts as champion run:
+  - copy: mean len 20.8-22.5, acc 0.896-0.905 — matches kat-dspark 22.50/0.89583
+    exactly (ngram-mod dominates copy; heads equivalent there)
+  - novel: mean len 5.4-11.7 vs kat-dspark 2.4-3.9 — REDHAT DRAFTS ~2x LONGER
+    on fresh text (native markov+conf head pays off on novel)
+- Implication: longer novel drafts = fewer verify rounds = less expert
+  streaming per accepted token — novel t/s COULD beat 26.0; unproven until
+  clean re-run (needs ~17.5GB free + quiet box).
+- NEXT: clean re-run when RAM allows; if confirmed, RedHat replaces kat-dspark
+  as champion draft for Ornith.
