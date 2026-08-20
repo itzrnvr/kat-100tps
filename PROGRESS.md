@@ -910,3 +910,16 @@ Target 19.8GB > VRAM 8GB => experts RAM-resident (-cmoe).
   control plane is BOTH faster and smaller than the official imatrix mix.
   The official quant's Q6_K down_exps choice costs ~20% speed for quality
   on 21/41 layers we may not need.
+
+## V115 (pre-registration) — gate redesign after review
+- CAUGHT BEFORE NUMBERS LANDED: original gate (KAT-vs-Ornith delta, +0.5/+1.0
+  thresholds) conflated cross-model differences with requant damage, and was
+  looser than the campaign's own V98 standard without justification.
+- Correct design: Ornith-official-PPL vs Ornith-CQ-PPL (same model, 21
+  tensors differ). True baseline requires re-download (in-place patch
+  destroyed the original; broken file is unloadable).
+- Gates re-aligned to V98: PASS <= +0.05, MARGINAL <= +0.30, FAIL > +0.30.
+  KAT same-run PPL retained as context/anchor only.
+- Measurement order: KAT PPL (running) -> redownload official -> official
+  PPL -> CQ PPL -> verdict. ~2h total, machine dedicated (no disk
+  contention during runs).
