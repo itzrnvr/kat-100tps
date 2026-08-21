@@ -1215,3 +1215,18 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   distribution; RedHat's head pays the cross-trunk fine-tune penalty on novel.
   All fork/converter fixes retained: every future speculators dspark export
   converts correctly (zero-norm skip, d2t placement, optional norm/rope).
+## V126b — converter now REPRODUCES the fix (advisory addressed)
+- Previous commit only skipped the zero norm -> identity (0.22-0.59, worst
+  variant). Manual verifier-norm graft was unreproducible. FIXED:
+  DFlashModel._load_verifier_final_norm() resolves the verifier's
+  model.language_model.norm.weight / model.norm.weight from --target-model-dir
+  shards, else speculators_config.verifier.name_or_path via HF index + range
+  request; DSparkModel zero-norm skip now GRAFTS it (route via tensor map ->
+  output_norm.weight), identity only as fallback.
+- Verified end-to-end on the ORIGINAL all-zero checkpoint: converter logs
+  "grafting verifier final norm model.language_model.norm.weight (mean
+  1.6279)"; GGUF output_norm.weight F32 mean 1.6152 (matches manual graft);
+  draft-capture shows sharp logits (0.43/0.33/0.07, true newline token at
+  top), acceptance 0.32/ml 2.24 on cold prompt -> reproduces the 0.40-0.64 fix.
+- Any future speculators dspark/dflash export with the dead-norm artifact now
+  converts correctly with zero manual steps.
