@@ -1208,3 +1208,10 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   cross-trunk penalty, not a bug. kat head (SpecForge, 6 blocks, 8 extract
   layers, trained during campaign) still fits this trunk better: 0.83-0.96.
 - dspark-only t/s with fixed head: novel ~17-18 (vs kat-only 22.2).
+- FINAL compose (fixed head + ngram, mmap): novel 19.6 / copy 35.3
+  vs kat compose 23.6/35.5, vs pre-fix (dead head) 19.8/26.0.
+  VERDICT: fix is real (copy +35%: the head now contributes alongside ngram),
+  but kat stays champion — its head was trained against this campaign's trunk
+  distribution; RedHat's head pays the cross-trunk fine-tune penalty on novel.
+  All fork/converter fixes retained: every future speculators dspark export
+  converts correctly (zero-norm skip, d2t placement, optional norm/rope).
