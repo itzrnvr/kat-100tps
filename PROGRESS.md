@@ -1187,3 +1187,24 @@ Cost: ~25 min wasted measurement. The KAT anchor (6.9831) is unaffected.
   Divergence at pos 0 = fork graph bug (bisect intermediates); match at pos 0
   + divergence later = chain-conditioning mismatch.
 - Champion unchanged: kat-dspark-v2 + ngram-mod compose.
+## V126 — ROOT CAUSE FOUND AND FIXED: RedHat dspark checkpoint ships all-zero final norm
+- The smoking gun: draft candidates at -lv 5 showed a UNIFORM distribution
+  (all top-10 probs exactly 0.100) -> constant forward. Pure-torch reference
+  forward of the checkpoint reproduced it: final norm output EXACTLY 0.0.
+- Byte check: 'norm.weight' [2048] in redhat-dspark.safetensors is 0/2048
+  nonzero (dead tensor). speculators' serving pipeline doesn't rely on it as
+  shipped; llama.cpp RMSNorm(x*w) zeroes logits with it.
+- FIX: graft a real final norm into the head + reconvert. Candidates:
+  * Ornith trunk norm (mean 1.640): acceptance 0.00 -> 0.40-0.64, ml 1.8-2.9
+  * TRUE Qwen3.6-35B-A3B verifier norm (range-fetched from HF, mean 1.628):
+    acceptance 0.40-0.64 (same; norms nearly identical, fine-tune pair)
+  * identity (skip norm): 0.22-0.59 — WORSE. The norm is real and needed.
+- Fork hardening (committed): dflash output_norm now TENSOR_NOT_REQUIRED;
+  graph skips the norm when absent. Converter skips all-zero top-level norm
+  tensors (log line: 'skipping all-zero norm tensor'). ALSO: d2t mapped to
+  SET_ROWS probe (fixes d2t->CPU exile), optional IMROPE rope sections.
+- Model-card context: card claims 71-78% pos-0 acceptance / 3.4-3.9 mean len
+  ON Qwen3.6-35B-A3B. We serve ORNITH (fine-tune) -> 0.40-0.64 is the
+  cross-trunk penalty, not a bug. kat head (SpecForge, 6 blocks, 8 extract
+  layers, trained during campaign) still fits this trunk better: 0.83-0.96.
+- dspark-only t/s with fixed head: novel ~17-18 (vs kat-only 22.2).
